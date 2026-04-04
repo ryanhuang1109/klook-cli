@@ -1,0 +1,236 @@
+/**
+ * trip/detail — Show Trip.com activity detail with package pricing.
+ *
+ * Navigates to the activity page, optionally selects a date range,
+ * and extracts title, description, rating, images, and package pricing.
+ * Uses Browser Bridge (COOKIE strategy) since Trip.com is SSR.
+ */
+import { cli, Strategy } from '@jackwener/opencli/registry';
+import type { IPage } from '@jackwener/opencli/registry';
+import { parseActivityDetail } from '../../shared/parsers.js';
+
+export function parseActivityId(input: string): string {
+  const urlMatch = input.match(/\/detail\/(\d+)/);
+  if (urlMatch) return urlMatch[1];
+  if (/^\d+$/.test(input.trim())) return input.trim();
+  return input;
+}
+
+export function buildDetailEvaluate(): string {
+  return `
+    (async () => {
+      const str = (v) => v == null ? '' : String(v).trim();
+
+      // Title: Trip.com uses div[class*=title_foot_warp_left] instead of h1
+      // Fall back to document.title with Trip.com suffix stripped
+      let title = str(
+        document.querySelector('[class*="title_foot_warp_left"]')?.textContent
+        || document.querySelector('h1')?.textContent
+        || document.title?.replace(/\\s*\\|\\s*Trip\\.com.*$/, '')
+      );
+      // Clean: title div may contain promotion text appended after the real title
+      const promoIdx = title.indexOf('Promotion');
+      if (promoIdx > 10) title = title.slice(0, promoIdx).trim();
+      const durationIdx = title.indexOf('Duration:');
+      if (durationIdx > 10) title = title.slice(0, durationIdx).trim();
+
+      // Description from meta
+      const description = str(
+        document.querySelector('meta[name="description"]')?.getAttribute('content')
+      );
+
+      // Rating + reviews: scan page text for patterns like "4.8/5" and "(419 reviews)"
+      let starScore = '', reviewCount = '';
+      const bodyText = document.body.innerText;
+      const ratingMatch = bodyText.match(/(\\d\\.\\d)\\/5/);
+      if (ratingMatch) starScore = ratingMatch[1];
+      const reviewMatch = bodyText.match(/\\(?(\\d[\\d,]*\\s*reviews?)\\)?/i);
+      if (reviewMatch) reviewCount = reviewMatch[1];
+
+      // Images from CDN
+      const seenImgs = new Set();
+      const images = Array.from(document.querySelectorAll('img[src*="tripcdn"], img[src*="trip.com"]'))
+        .map((img) => img.src)
+        .filter((src) => src.includes('/images/') && !seenImgs.has(src) && (seenImgs.add(src), true))
+        .slice(0, 10);
+
+      // Available dates from date selector
+      const dateCells = document.querySelectorAll('[class*="date_ceil_wrapper"]');
+      const availableDates = Array.from(dateCells)
+        .map((el) => str(el.textContent))
+        .filter(Boolean);
+
+      // Packages from package_item_new elements
+      const pkgEls = document.querySelectorAll('[class*="package_item_new"]');
+      const packages = Array.from(pkgEls).map((el) => {
+        const text = str(el.textContent);
+        // Name: everything before "From" or price pattern
+        const nameMatch = text.match(/^(.+?)(?:From|US\\$|HK\\$|TWD|EUR|JPY|SGD|KRW)/);
+        const name = nameMatch ? str(nameMatch[1]) : text.slice(0, 120);
+        // Price
+        const priceMatch = text.match(/((?:US|HK|TWD|EUR|JPY|SGD|KRW)\\$?\\s*[\\d,.]+)/);
+        const price = priceMatch ? priceMatch[1] : '';
+        // Original price (strikethrough)
+        const delEl = el.querySelector('del, [class*="line-through"], [class*="original"], [class*="market"]');
+        const originalPrice = delEl ? str(delEl.textContent) : '';
+        // Discount
+        const discountEl = el.querySelector('[class*="discount"], [class*="off"], [class*="save"]');
+        const discount = discountEl ? str(discountEl.textContent) : '';
+        // Availability
+        const soldOut = /sold out|unavailable/i.test(text);
+
+        return {
+          name,
+          description: '',
+          inclusions: [],
+          exclusions: [],
+          price,
+          currency: price.match(/^[A-Z]+\\$?/)?.[0] || '',
+          originalPrice,
+          discount,
+          date: availableDates[0] || '',
+          availability: soldOut ? 'Sold out' : 'Available',
+        };
+      });
+
+      return {
+        title,
+        description,
+        cityName: '',
+        categoryName: '',
+        starScore,
+        reviewCount,
+        images,
+        itinerary: [],
+        packages,
+        url: location.href,
+      };
+    })()
+  `;
+}
+
+/** Build JS to click a specific date in the date selector and wait for price update. */
+export function buildDateClickEvaluate(targetDate: string): string {
+  return `
+    (async () => {
+      const target = ${JSON.stringify(targetDate)};
+      const dateCells = document.querySelectorAll('[class*="date_ceil_wrapper"]');
+      for (const cell of dateCells) {
+        const text = (cell.textContent || '').trim();
+        if (text.includes(target)) {
+          cell.click();
+          return true;
+        }
+      }
+      // If target not in visible dates, try clicking a "more dates" button or calendar
+      const moreBtn = document.querySelector('[class*="calendar_more"], [class*="see_more_date"], [class*="date_picker"]');
+      if (moreBtn) moreBtn.click();
+      return false;
+    })()
+  `;
+}
+
+/**
+ * Collect pricing across multiple dates by clicking each date tab.
+ * Returns an array of { date, packages[] } for each available date.
+ */
+export function buildMultiDateEvaluate(): string {
+  return `
+    (async () => {
+      const str = (v) => v == null ? '' : String(v).trim();
+      const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
+      const getPrices = () => {
+        const items = document.querySelectorAll('[class*="package_item_new"]');
+        return Array.from(items).map((el) => {
+          const text = str(el.textContent);
+          const nameMatch = text.match(/^(.+?)(?:From|US\\$|HK\\$|TWD|EUR|JPY|SGD|KRW)/);
+          const name = nameMatch ? str(nameMatch[1]) : text.slice(0, 120);
+          const priceMatch = text.match(/((?:US|HK|TWD|EUR|JPY|SGD|KRW)\\$?\\s*[\\d,.]+)/);
+          const price = priceMatch ? priceMatch[1] : '';
+          const soldOut = /sold out|unavailable/i.test(text);
+          return { name, price, availability: soldOut ? 'Sold out' : 'Available' };
+        });
+      };
+
+      const dateCells = Array.from(document.querySelectorAll('[class*="date_ceil_wrapper"]'));
+      const results = [];
+
+      for (const cell of dateCells) {
+        const dateText = str(cell.textContent);
+        if (!dateText || dateText === 'All') continue;
+        cell.click();
+        await delay(1500);
+        const packages = getPrices();
+        results.push({ date: dateText, packages });
+      }
+
+      return results;
+    })()
+  `;
+}
+
+cli({
+  site: 'trip',
+  name: 'detail',
+  description: 'Show Trip.com activity detail with package pricing across dates',
+  domain: 'www.trip.com',
+  strategy: Strategy.COOKIE,
+  browser: true,
+  args: [
+    { name: 'activity', required: true, positional: true, help: 'Activity ID or URL (e.g. "92795279")' },
+    { name: 'date', help: 'Specific date (YYYY-MM-DD) to check pricing' },
+    { name: 'compare-dates', type: 'boolean', help: 'Compare pricing across all visible dates' },
+  ],
+  columns: ['title', 'rating', 'review_count'],
+  defaultFormat: 'json',
+  func: async (page: IPage, kwargs) => {
+    const input = String(kwargs.activity || '').trim();
+    if (!input) throw new Error('Activity ID or URL is required');
+
+    const activityId = parseActivityId(input);
+    const url = input.startsWith('http')
+      ? input
+      : `https://www.trip.com/things-to-do/detail/${activityId}/`;
+
+    // If specific date requested, add date param to URL
+    let targetUrl = url;
+    if (kwargs.date) {
+      const dateStr = String(kwargs.date);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        throw new Error('date must be in YYYY-MM-DD format');
+      }
+      targetUrl = url.includes('?')
+        ? `${url}&date=${dateStr}`
+        : `${url}?date=${dateStr}`;
+    }
+
+    await page.goto(targetUrl);
+    await page.wait(5000);
+    await page.autoScroll({ times: 3, delayMs: 1500 });
+
+    // If compare-dates flag is set, collect pricing across all visible dates
+    if (kwargs['compare-dates']) {
+      const raw = await page.evaluate(buildDetailEvaluate());
+      const detail = parseActivityDetail(raw || {});
+
+      const datePricing = await page.evaluate(buildMultiDateEvaluate());
+      const pricingByDate = Array.isArray(datePricing) ? datePricing : [];
+
+      return {
+        ...detail,
+        pricing_by_date: pricingByDate,
+      };
+    }
+
+    // Standard detail extraction
+    const raw = await page.evaluate(buildDetailEvaluate());
+    if (!raw || !raw.title) {
+      throw new Error('Could not extract activity detail from Trip.com.');
+    }
+
+    return parseActivityDetail(raw);
+  },
+});
+
+export const __test__ = { parseActivityId };
