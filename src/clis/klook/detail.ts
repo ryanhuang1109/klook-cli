@@ -14,112 +14,94 @@ export function buildDetailEvaluate(): string {
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
 
-      // Strategy 1: __NEXT_DATA__
-      const byBootstrap = () => {
-        const pageProps = window.__NEXT_DATA__?.props?.pageProps;
-        if (!pageProps) return null;
+      // Klook is a Vue 2 app — no __NEXT_DATA__. Extract from DOM directly.
+      const title = str(document.querySelector('h1')?.textContent);
 
-        const queue = [pageProps];
-        while (queue.length) {
-          const node = queue.shift();
-          if (!node || typeof node !== 'object') continue;
-          if (node.title && (node.packages || node.options || node.description)) {
-            const pkgSource = node.packages || node.options || [];
-            return {
-              title: str(node.title),
-              description: str(node.description || node.summary || node.intro),
-              cityName: str(node.cityName || node.city),
-              categoryName: str(node.categoryName || node.category),
-              starScore: str(node.starScore || node.score || node.rating),
-              reviewCount: str(node.reviewCount || node.reviewTotal || node.commentCount),
-              images: (node.images || node.photos || node.gallery || [])
-                .map((img) => str(typeof img === 'string' ? img : img?.url || img?.src))
-                .filter(Boolean),
-              itinerary: (node.itinerary || node.schedule || []).map((step) => ({
-                time: str(step.time || step.startTime),
-                title: str(step.title || step.name),
-                description: str(step.description || step.content),
-              })),
-              packages: Array.isArray(pkgSource) ? pkgSource.map((pkg) => ({
-                name: str(pkg.name || pkg.title),
-                description: str(pkg.description || pkg.intro),
-                inclusions: Array.isArray(pkg.inclusions) ? pkg.inclusions.map(str) : [],
-                exclusions: Array.isArray(pkg.exclusions) ? pkg.exclusions.map(str) : [],
-                price: str(pkg.price || pkg.salePrice),
-                currency: str(pkg.currency || pkg.currencyCode),
-                originalPrice: str(pkg.originalPrice || pkg.marketPrice),
-                discount: str(pkg.discount || pkg.discountTag),
-                date: str(pkg.date || pkg.useDate),
-                availability: str(pkg.availability || pkg.status || 'unknown'),
-              })) : [],
-              url: location.href,
-            };
-          }
-          if (!Array.isArray(node)) {
-            for (const v of Object.values(node)) queue.push(v);
+      // Description from meta tag (cleaner than DOM text)
+      const description = str(
+        document.querySelector('meta[name="description"]')?.getAttribute('content')
+      );
+
+      // Rating + reviews: scan all <span> for patterns
+      let starScore = '', reviewCount = '';
+      const spans = Array.from(document.querySelectorAll('span'));
+      for (const s of spans) {
+        const t = str(s.textContent);
+        if (!starScore && /^\\d\\.\\d$/.test(t)) { starScore = t; }
+        if (!reviewCount && /\\d.*reviews?/i.test(t)) { reviewCount = t; }
+      }
+
+      // Images: activity images from Klook CDN
+      const seen = new Set();
+      const images = Array.from(document.querySelectorAll('img[src*="activities/"]'))
+        .map((img) => img.src)
+        .filter((src) => {
+          if (seen.has(src)) return false;
+          seen.add(src);
+          return true;
+        })
+        .slice(0, 10);
+
+      // Breadcrumb for city/category
+      const breadcrumbs = Array.from(document.querySelectorAll('#breadCrumb a, [id*="breadCrumb"] a'))
+        .map((a) => str(a.textContent))
+        .filter(Boolean);
+      const cityName = breadcrumbs.length >= 2 ? breadcrumbs[breadcrumbs.length - 2] : '';
+      const categoryName = breadcrumbs.length >= 1 ? breadcrumbs[breadcrumbs.length - 1] : '';
+
+      // Package prices: find all price strings in the package section
+      const pkgSection = document.getElementById('package_option');
+      const packages = [];
+      if (pkgSection) {
+        // Find all visible price elements
+        const priceEls = pkgSection.querySelectorAll('[class*="price"], span');
+        const priceSet = new Set();
+        for (const el of priceEls) {
+          const t = str(el.textContent);
+          // Match price patterns like "US$ 48.29", "HK$ 450", "TWD 2,400"
+          const match = t.match(/^([A-Z]{2,3}\\$?)\\s*([\\d,.]+)$/);
+          if (match && !priceSet.has(t)) {
+            priceSet.add(t);
+            packages.push({
+              name: '',
+              description: '',
+              inclusions: [],
+              exclusions: [],
+              price: t,
+              currency: match[1].trim(),
+              originalPrice: '',
+              discount: '',
+              date: '',
+              availability: 'Available',
+            });
           }
         }
-        return null;
+
+        // Try to find package names from headings/labels near prices
+        const nameEls = pkgSection.querySelectorAll('h3, h4, [class*="name"], [class*="title"]');
+        const names = Array.from(nameEls)
+          .map((el) => str(el.textContent))
+          .filter((t) => t && t.length > 3 && t.length < 200
+            && !t.includes('Package options') && !t.includes('Select')
+            && !t.includes('Clear') && !t.includes('Quantity'));
+        // Assign names to packages if counts align
+        for (let i = 0; i < Math.min(names.length, packages.length); i++) {
+          packages[i].name = names[i];
+        }
+      }
+
+      return {
+        title,
+        description,
+        cityName,
+        categoryName,
+        starScore,
+        reviewCount,
+        images,
+        itinerary: [],
+        packages,
+        url: location.href,
       };
-
-      // Strategy 2: DOM scraping
-      const byDom = () => {
-        const title = str(document.querySelector('h1, [data-testid="activity-title"]')?.textContent);
-        const description = str(
-          document.querySelector('[data-testid="activity-description"], .activity-intro, [class*="description"]')?.textContent
-        );
-        const images = Array.from(document.querySelectorAll(
-          '[data-testid="gallery"] img, .activity-gallery img, .swiper img, [class*="gallery"] img'
-        )).map((img) => img.getAttribute('src') || '').filter(Boolean);
-
-        const ratingEl = document.querySelector('[data-testid="activity-rating"], [class*="rating"]');
-        const rating = str(ratingEl?.textContent).match(/[\d.]+/)?.[0] || '';
-        const reviewCount = str(
-          document.querySelector('[data-testid="activity-reviews"], [class*="review"]')?.textContent
-        ).replace(/[^\d]/g, '');
-
-        const pkgEls = document.querySelectorAll(
-          '[data-testid="package-card"], [class*="package-option"], [class*="sku-card"], .package-card'
-        );
-        const packages = Array.from(pkgEls).map((el) => {
-          const name = str(el.querySelector('[class*="package-name"], .name, h3, h4')?.textContent);
-          const priceEl = el.querySelector('[class*="price"]');
-          const price = str(priceEl?.textContent).replace(/[^\d,.]/g, '');
-          const currency = str(priceEl?.textContent).replace(/[\d,.\s]/g, '').trim();
-          const originalEl = el.querySelector('del, [class*="original"], [class*="line-through"]');
-          const originalPrice = str(originalEl?.textContent).replace(/[^\d,.]/g, '');
-          const discount = str(el.querySelector('[class*="discount"], [class*="off"]')?.textContent);
-          const availability = str(el.querySelector('[class*="availability"], [class*="sold-out"]')?.textContent) || 'Available';
-          return {
-            name,
-            description: str(el.querySelector('[class*="desc"]')?.textContent),
-            inclusions: [],
-            exclusions: [],
-            price,
-            currency,
-            originalPrice,
-            discount,
-            date: '',
-            availability,
-          };
-        });
-
-        return {
-          title,
-          description,
-          cityName: '',
-          categoryName: '',
-          starScore: rating,
-          reviewCount,
-          images,
-          itinerary: [],
-          packages,
-          url: location.href,
-        };
-      };
-
-      const result = byBootstrap() || byDom();
-      return result;
     })()
   `;
 }
