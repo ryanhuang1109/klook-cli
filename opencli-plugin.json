@@ -1,0 +1,6 @@
+{
+  "name": "klook",
+  "version": "0.1.0",
+  "description": "Klook.com CLI — search activities, trending, and pricing",
+  "opencli": ">=1.0.0"
+}
