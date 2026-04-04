@@ -73,10 +73,10 @@ export function buildDetailEvaluate(): string {
         )).map((img) => img.getAttribute('src') || '').filter(Boolean);
 
         const ratingEl = document.querySelector('[data-testid="activity-rating"], [class*="rating"]');
-        const rating = str(ratingEl?.textContent).match(/[\\d.]+/)?.[0] || '';
+        const rating = str(ratingEl?.textContent).match(/[\d.]+/)?.[0] || '';
         const reviewCount = str(
           document.querySelector('[data-testid="activity-reviews"], [class*="review"]')?.textContent
-        ).replace(/[^\\d]/g, '');
+        ).replace(/[^\d]/g, '');
 
         const pkgEls = document.querySelectorAll(
           '[data-testid="package-card"], [class*="package-option"], [class*="sku-card"], .package-card'
@@ -84,10 +84,10 @@ export function buildDetailEvaluate(): string {
         const packages = Array.from(pkgEls).map((el) => {
           const name = str(el.querySelector('[class*="package-name"], .name, h3, h4')?.textContent);
           const priceEl = el.querySelector('[class*="price"]');
-          const price = str(priceEl?.textContent).replace(/[^\\d,.]/g, '');
-          const currency = str(priceEl?.textContent).replace(/[\\d,.\\s]/g, '').trim();
+          const price = str(priceEl?.textContent).replace(/[^\d,.]/g, '');
+          const currency = str(priceEl?.textContent).replace(/[\d,.\s]/g, '').trim();
           const originalEl = el.querySelector('del, [class*="original"], [class*="line-through"]');
-          const originalPrice = str(originalEl?.textContent).replace(/[^\\d,.]/g, '');
+          const originalPrice = str(originalEl?.textContent).replace(/[^\d,.]/g, '');
           const discount = str(el.querySelector('[class*="discount"], [class*="off"]')?.textContent);
           const availability = str(el.querySelector('[class*="availability"], [class*="sold-out"]')?.textContent) || 'Available';
           return {
@@ -150,11 +150,19 @@ cli({
 
     if (kwargs.date) {
       const dateStr = String(kwargs.date);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        throw new Error('date must be in YYYY-MM-DD format');
+      }
+      const day = dateStr.split('-').pop();
       await page.evaluate(`
         (() => {
-          const dateButtons = document.querySelectorAll('[data-date="${dateStr}"], [aria-label*="${dateStr}"], button, [role="button"]');
+          const dateStr = ${JSON.stringify(dateStr)};
+          const day = ${JSON.stringify(day)};
+          const dateButtons = document.querySelectorAll(
+            '[data-date="' + dateStr + '"], [aria-label*="' + dateStr + '"], button, [role="button"]'
+          );
           for (const btn of dateButtons) {
-            if (btn.textContent?.includes('${dateStr.split('-').pop()}') || btn.getAttribute('data-date') === '${dateStr}') {
+            if (btn.textContent?.includes(day) || btn.getAttribute('data-date') === dateStr) {
               btn.click();
               return true;
             }

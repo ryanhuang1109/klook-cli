@@ -1,6 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseTrendingResults } from '../../shared/parsers.js';
+import { clampLimit } from './search.js';
 
 export function normalizeCitySlug(city: string): string {
   return city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -65,10 +66,10 @@ export function buildTrendingEvaluate(limit: number): string {
             const root = el.closest('[data-testid*="card"]') || el;
             const title = str(root.querySelector('h3, h4, .title, [class*="title"]')?.textContent);
             const priceEl = root.querySelector('[class*="price"]');
-            const price = str(priceEl?.textContent).replace(/[^\\d,.]/g, '');
-            const currency = str(priceEl?.textContent).replace(/[\\d,.\\s]/g, '').trim();
-            const rating = str(root.querySelector('[class*="rating"], .star')?.textContent).match(/[\\d.]+/)?.[0] || '';
-            const reviewCount = str(root.querySelector('[class*="review"]')?.textContent).replace(/[^\\d]/g, '');
+            const price = str(priceEl?.textContent).replace(/[^\d,.]/g, '');
+            const currency = str(priceEl?.textContent).replace(/[\d,.\s]/g, '').trim();
+            const rating = str(root.querySelector('[class*="rating"], .star')?.textContent).match(/[\d.]+/)?.[0] || '';
+            const reviewCount = str(root.querySelector('[class*="review"]')?.textContent).replace(/[^\d]/g, '');
             const category = str(root.querySelector('[class*="category"], .tag')?.textContent);
             return { title, price, currency, starScore: rating, reviewCount, categoryName: category, cityName: '', deeplink: href };
           })
@@ -94,7 +95,6 @@ cli({
   args: [
     { name: 'city', required: true, positional: true, help: 'City name (e.g. "osaka", "tokyo", "hong-kong")' },
     { name: 'limit', type: 'int', default: 10, help: 'Max results (1-50)' },
-    { name: 'category', choices: ['attractions', 'tours', 'transport'], help: 'Filter by category' },
   ],
   columns: ['rank', 'title', 'price', 'currency', 'rating', 'review_count', 'category', 'url'],
   func: async (page: IPage, kwargs) => {
@@ -102,7 +102,7 @@ cli({
     if (!city) throw new Error('City name is required');
 
     const slug = normalizeCitySlug(city);
-    const limit = Math.max(1, Math.min(Number(kwargs.limit) || 10, 50));
+    const limit = clampLimit(kwargs.limit, 10);
     const url = `https://www.klook.com/city/${slug}/`;
 
     await page.goto(url);

@@ -123,7 +123,6 @@ cli({
   args: [
     { name: 'query', required: true, positional: true, help: 'Search keyword (e.g. "Tokyo Disneyland")' },
     { name: 'city', help: 'Filter by city name' },
-    { name: 'category', help: 'Filter by category' },
     { name: 'limit', type: 'int', default: 20, help: 'Max results (1-50)' },
     { name: 'sort', choices: ['price', 'rating', 'popular'], help: 'Sort order' },
   ],
