@@ -49,45 +49,100 @@ export function buildDetailEvaluate(): string {
       const cityName = breadcrumbs.length >= 2 ? breadcrumbs[breadcrumbs.length - 2] : '';
       const categoryName = breadcrumbs.length >= 1 ? breadcrumbs[breadcrumbs.length - 1] : '';
 
-      // Package prices: find all price strings in the package section
+      // Packages: extract from h3 headings + price spans inside #package_option
       const pkgSection = document.getElementById('package_option');
       const packages = [];
       if (pkgSection) {
-        // Find all visible price elements
-        const priceEls = pkgSection.querySelectorAll('[class*="price"], span');
+        // Package names are h3 inside #package_option (excluding "Package options" header)
+        const h3s = Array.from(pkgSection.querySelectorAll('h3'));
+        const pkgNames = h3s
+          .map((h) => str(h.textContent))
+          .filter((t) => t && t !== 'Package options');
+
+        // Find unique price strings
+        const priceSpans = pkgSection.querySelectorAll('span');
+        const prices = [];
         const priceSet = new Set();
-        for (const el of priceEls) {
-          const t = str(el.textContent);
-          // Match price patterns like "US$ 48.29", "HK$ 450", "TWD 2,400"
+        for (const s of priceSpans) {
+          const t = str(s.textContent);
           const match = t.match(/^([A-Z]{2,3}\\$?)\\s*([\\d,.]+)$/);
           if (match && !priceSet.has(t)) {
             priceSet.add(t);
-            packages.push({
-              name: '',
-              description: '',
-              inclusions: [],
-              exclusions: [],
-              price: t,
-              currency: match[1].trim(),
-              originalPrice: '',
-              discount: '',
-              date: '',
-              availability: 'Available',
-            });
+            prices.push({ full: t, currency: match[1].trim() });
           }
         }
 
-        // Try to find package names from headings/labels near prices
-        const nameEls = pkgSection.querySelectorAll('h3, h4, [class*="name"], [class*="title"]');
-        const names = Array.from(nameEls)
+        // Find discount tags
+        const discountEls = pkgSection.querySelectorAll('[class*="discount"], [class*="off"]');
+        const discountTexts = Array.from(discountEls)
           .map((el) => str(el.textContent))
-          .filter((t) => t && t.length > 3 && t.length < 200
-            && !t.includes('Package options') && !t.includes('Select')
-            && !t.includes('Clear') && !t.includes('Quantity'));
-        // Assign names to packages if counts align
-        for (let i = 0; i < Math.min(names.length, packages.length); i++) {
-          packages[i].name = names[i];
+          .filter((t) => /\\d+%/.test(t) && t.length < 20);
+        const discount = discountTexts.length > 0 ? discountTexts[0] : '';
+
+        // Create one package per name, with shared price if only one price found
+        for (let i = 0; i < pkgNames.length; i++) {
+          const price = prices[i] || prices[0] || { full: '', currency: '' };
+          packages.push({
+            name: pkgNames[i],
+            description: '',
+            inclusions: [],
+            exclusions: [],
+            price: price.full,
+            currency: price.currency,
+            originalPrice: '',
+            discount,
+            date: '',
+            availability: 'Available',
+          });
         }
+      }
+
+      // Itinerary: extract from .itinerary-day-group.desktop elements
+      const itinGroups = document.querySelectorAll('.itinerary-day-group.desktop');
+      const itinerary = [];
+      const seenTimes = new Set();
+      for (const g of itinGroups) {
+        const titleEl = g.querySelector('.itinerary-day-group-title');
+        const rawTitle = str(titleEl?.textContent);
+        const timeMatch = rawTitle.match(/(\\d{1,2}:\\d{2})/);
+        const time = timeMatch ? timeMatch[1] : '';
+        // Deduplicate by time (multiple packages share same itinerary)
+        if (time && seenTimes.has(time)) continue;
+        if (time) seenTimes.add(time);
+        // Clean title: remove "From" prefix and time
+        const title = rawTitle.replace(/^From\\s+/, '').replace(time, '').trim() || rawTitle;
+        const descEl = g.querySelector('[class*="content"]');
+        const description = str(descEl?.textContent)
+          .replace(/See (more|less)/g, '')
+          .replace(/Some attractions .*/g, '')
+          .trim()
+          .slice(0, 500);
+        if (time || title) {
+          itinerary.push({ time, title, description });
+        }
+      }
+
+      // Inclusions: from "What's included" klk-collapse-item
+      // Klook uses .klk-collapse-item with title text matching "included"
+      let inclusions = [], exclusions = [];
+      const collapseItems = document.querySelectorAll('.klk-collapse-item');
+      for (const item of collapseItems) {
+        const titleEl = item.querySelector('.klk-collapse-item-title');
+        if (!titleEl || !/included/i.test(titleEl.textContent)) continue;
+        const content = item.querySelector('.klk-collapse-item-content-inner') || item;
+        const uls = content.querySelectorAll('ul');
+        if (uls.length >= 2) {
+          inclusions = Array.from(uls[0].querySelectorAll('li')).map((li) => str(li.textContent));
+          exclusions = Array.from(uls[1].querySelectorAll('li')).map((li) => str(li.textContent));
+        } else if (uls.length === 1) {
+          inclusions = Array.from(uls[0].querySelectorAll('li')).map((li) => str(li.textContent));
+        }
+        break;
+      }
+      // Attach inclusions/exclusions to all packages
+      for (const pkg of packages) {
+        pkg.inclusions = inclusions;
+        pkg.exclusions = exclusions;
       }
 
       return {
@@ -98,7 +153,7 @@ export function buildDetailEvaluate(): string {
         starScore,
         reviewCount,
         images,
-        itinerary: [],
+        itinerary,
         packages,
         url: location.href,
       };
