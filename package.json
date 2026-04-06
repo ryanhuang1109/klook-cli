@@ -30,6 +30,7 @@
   "devDependencies": {
     "@jackwener/opencli": "^1.6.1",
     "@types/node": "^22.13.10",
+    "@types/sql.js": "^1.4.11",
     "tsx": "^4.19.3",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"
