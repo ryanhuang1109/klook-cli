@@ -19,7 +19,9 @@ import './clis/klook/detail.js';
 import './clis/trip/search.js';
 import './clis/trip/detail.js';
 import './clis/getyourguide/search.js';
+import './clis/getyourguide/detail.js';
 import './clis/kkday/search.js';
+import './clis/kkday/detail.js';
 
 async function runWithBrowser(cmd: CliCommand, kwargs: Record<string, unknown>): Promise<unknown> {
   // BrowserBridge is not in opencli's public API — try dynamic import
