@@ -45,3 +45,40 @@ export interface KlookDetail {
   packages: KlookPackage[];
   url: string;
 }
+
+/** A POI (Point of Interest) to monitor across platforms. */
+export interface POI {
+  name: string;
+  keywords: string[];
+  platforms: string[];
+  date_range?: string;
+}
+
+/** A single product in a comparison group. */
+export interface CompareProduct {
+  platform: string;
+  title: string;
+  price_usd: number | null;
+  price_original: string;
+  rating: string;
+  review_count: string;
+  url: string;
+  notes: string;
+}
+
+/** A group of similar/equivalent products across platforms. */
+export interface CompareGroup {
+  group_name: string;
+  description: string;
+  products: CompareProduct[];
+  cheapest: string;
+  best_rated: string;
+}
+
+/** Full comparison result from LLM clustering. */
+export interface CompareResult {
+  query: string;
+  date: string;
+  groups: CompareGroup[];
+  currency_rates_used: string;
+}
