@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "tsc && cp -r src/web/public dist/web/public",
+    "build": "tsc && rm -rf dist/web/public && cp -r src/web/public dist/web/public",
     "web": "node dist/web/server.js",
     "start": "node dist/cli.js",
     "test": "vitest run",
