@@ -14,7 +14,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', createApiRouter());
 
-app.get('*', (_req, res) => {
+// SPA fallback — Express 5 requires named catch-all parameter
+app.get('{*path}', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
