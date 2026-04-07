@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>klook-cli — Competitor Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .font-mono-cell { font-family: 'Courier New', Courier, monospace; }
+    .spinner {
+      display: inline-block;
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid #e5e7eb;
+      border-top-color: #111827;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-gray-200 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+      <span class="font-mono text-sm font-bold tracking-tight bg-black text-white px-2 py-0.5 rounded">klook-cli</span>
+      <span class="text-gray-400 text-sm font-medium">Competitor Monitor</span>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+    <!-- Top row: POI Management + Compare Controls -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- POI Management (1 col) -->
+      <div class="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">POI Management</h2>
+        </div>
+
+        <div id="poi-list" class="divide-y divide-gray-50 flex-1 overflow-y-auto max-h-80">
+          <div class="px-5 py-3 text-sm text-gray-400">Loading...</div>
+        </div>
+
+        <div class="px-5 py-4 border-t border-gray-100 space-y-3">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add POI</p>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Name</label>
+            <input
+              id="poi-name"
+              type="text"
+              placeholder="e.g. Eiffel Tower Skip-the-Line"
+              class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black placeholder-gray-300"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Keywords <span class="text-gray-400 font-normal">(one per line)</span></label>
+            <textarea
+              id="poi-keywords"
+              rows="3"
+              placeholder="eiffel tower&#10;skip the line&#10;summit access"
+              class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black placeholder-gray-300 resize-none"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Platforms</label>
+            <div class="flex flex-wrap gap-3">
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" id="plat-klook" value="klook" checked class="accent-black" /> Klook
+              </label>
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" id="plat-trip" value="trip.com" checked class="accent-black" /> Trip.com
+              </label>
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" id="plat-gyg" value="getyourguide" checked class="accent-black" /> GYG
+              </label>
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" id="plat-kkday" value="kkday" checked class="accent-black" /> KKday
+              </label>
+            </div>
+          </div>
+          <button
+            id="add-poi-btn"
+            onclick="addPoi()"
+            class="w-full bg-black text-white text-sm font-medium py-2 rounded hover:bg-gray-800 active:bg-gray-900 transition-colors"
+          >
+            Add POI
+          </button>
+          <p id="poi-form-msg" class="text-xs text-red-500 hidden"></p>
+        </div>
+      </div>
+
+      <!-- Compare Controls (2 cols) -->
+      <div class="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">Run Comparison</h2>
+        </div>
+
+        <div class="px-5 py-6 space-y-5 flex-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">POI</label>
+              <select id="compare-poi" class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black bg-white">
+                <option value="">— select a POI —</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Date</label>
+              <input id="compare-date" type="date" class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black" />
+            </div>
+          </div>
+
+          <button
+            id="run-compare-btn"
+            onclick="runCompare()"
+            class="bg-black text-white text-sm font-medium px-6 py-2 rounded hover:bg-gray-800 active:bg-gray-900 transition-colors"
+          >
+            Run Compare
+          </button>
+
+          <div id="compare-loading" class="hidden flex items-start gap-3 bg-gray-50 border border-gray-200 rounded p-4">
+            <div class="spinner mt-0.5 flex-shrink-0"></div>
+            <p class="text-sm text-gray-600">Searching platforms &amp; clustering with AI... this may take 1&ndash;2 minutes</p>
+          </div>
+
+          <p id="compare-error" class="hidden text-sm text-red-500"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results (full width) -->
+    <div id="results-section" class="hidden bg-white border border-gray-200 rounded-lg shadow-sm">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">Results</h2>
+        <div id="results-meta" class="text-sm text-gray-400 font-mono-cell"></div>
+      </div>
+      <div id="results-body" class="divide-y divide-gray-100"></div>
+      <div id="results-footer" class="px-5 py-3 text-xs text-gray-400 border-t border-gray-100"></div>
+    </div>
+
+    <!-- History (full width) -->
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">History</h2>
+      </div>
+
+      <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-end gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">POI</label>
+          <select id="history-poi" class="text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black bg-white">
+            <option value="">— select a POI —</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Days</label>
+          <select id="history-days" class="text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black bg-white">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <button
+          onclick="loadHistory()"
+          class="bg-black text-white text-sm font-medium px-5 py-1.5 rounded hover:bg-gray-800 active:bg-gray-900 transition-colors"
+        >
+          Load
+        </button>
+        <p id="history-error" class="hidden text-xs text-red-500"></p>
+      </div>
+
+      <div id="history-body" class="divide-y divide-gray-100">
+        <div class="px-5 py-4 text-sm text-gray-400">Select a POI and click Load to view history.</div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // ─── XSS prevention helper (required for any innerHTML usage) ─────────────
+    function esc(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = String(s);
+      return d.innerHTML;
+    }
+
+    // ─── Safe DOM builder ──────────────────────────────────────────────────────
+    // Creates elements via DOM APIs — no dynamic innerHTML
+    function mk(tag, cls) {
+      const el = document.createElement(tag);
+      if (cls) el.className = cls;
+      return el;
+    }
+
+    function txt(s) {
+      return document.createTextNode(String(s == null ? '' : s));
+    }
+
+    function append(parent) {
+      const children = Array.prototype.slice.call(arguments, 1);
+      for (let i = 0; i < children.length; i++) {
+        const c = children[i];
+        if (c != null) parent.appendChild(c);
+      }
+      return parent;
+    }
+
+    function attr(el, name, val) {
+      el.setAttribute(name, val);
+      return el;
+    }
+
+    function makeText(tag, cls, content) {
+      const el = mk(tag, cls);
+      el.textContent = content == null ? '' : String(content);
+      return el;
+    }
+
+    function makePlaceholder(msg) {
+      const el = mk('div', 'px-5 py-3 text-sm text-gray-400');
+      el.textContent = msg;
+      return el;
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    function today() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function fmtTimestamp(iso) {
+      if (!iso) return '';
+      try {
+        return new Date(iso).toLocaleString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      } catch (e) { return String(iso); }
+    }
+
+    function clearChildren(el) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    // ─── Initialise ───────────────────────────────────────────────────────────
+    document.getElementById('compare-date').value = today();
+
+    // ─── Load POIs ────────────────────────────────────────────────────────────
+    async function loadPois() {
+      try {
+        const res = await fetch('/api/pois');
+        if (!res.ok) throw new Error('Failed to load POIs');
+        const pois = await res.json();
+        renderPoiList(pois);
+        populatePoiDropdowns(pois);
+      } catch (err) {
+        const listEl = document.getElementById('poi-list');
+        clearChildren(listEl);
+        listEl.appendChild(makePlaceholder('Error: ' + err.message));
+      }
+    }
+
+    function renderPoiList(pois) {
+      const listEl = document.getElementById('poi-list');
+      clearChildren(listEl);
+
+      if (!pois || pois.length === 0) {
+        listEl.appendChild(makePlaceholder('No POIs yet. Add one below.'));
+        return;
+      }
+
+      pois.forEach(function(poi) {
+        const row = mk('div', 'px-5 py-3 flex items-start gap-2 hover:bg-gray-50 group');
+
+        const info = mk('div', 'flex-1 min-w-0');
+
+        const nameEl = makeText('p', 'text-sm font-semibold text-gray-900 leading-snug', poi.name);
+        append(info, nameEl);
+
+        const keywords = (poi.keywords || []).join(', ');
+        if (keywords) {
+          const kwEl = makeText('p', 'text-xs text-gray-400 mt-0.5 truncate', keywords);
+          append(info, kwEl);
+        }
+
+        if (poi.platforms && poi.platforms.length > 0) {
+          const badgesRow = mk('div', 'flex flex-wrap gap-1 mt-1');
+          poi.platforms.forEach(function(p) {
+            const badge = makeText('span', 'inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600', p);
+            append(badgesRow, badge);
+          });
+          append(info, badgesRow);
+        }
+
+        const delBtn = mk('button', 'flex-shrink-0 text-gray-300 hover:text-red-500 text-lg leading-none mt-0.5 transition-colors');
+        delBtn.textContent = '\u00D7';
+        attr(delBtn, 'type', 'button');
+        attr(delBtn, 'aria-label', 'Delete ' + (poi.name || ''));
+        delBtn.addEventListener('click', function() { deletePoi(poi.name); });
+
+        append(row, info, delBtn);
+        listEl.appendChild(row);
+      });
+    }
+
+    function populatePoiDropdowns(pois) {
+      var dropdowns = [
+        document.getElementById('compare-poi'),
+        document.getElementById('history-poi')
+      ];
+      dropdowns.forEach(function(sel) {
+        clearChildren(sel);
+        var placeholder = mk('option');
+        placeholder.value = '';
+        placeholder.textContent = '— select a POI —';
+        sel.appendChild(placeholder);
+        (pois || []).forEach(function(p) {
+          var opt = mk('option');
+          opt.value = p.name;
+          opt.textContent = p.name;
+          sel.appendChild(opt);
+        });
+      });
+    }
+
+    // ─── Add POI ──────────────────────────────────────────────────────────────
+    async function addPoi() {
+      var name = document.getElementById('poi-name').value.trim();
+      var keywordsRaw = document.getElementById('poi-keywords').value;
+      var keywords = keywordsRaw.split('\n').map(function(k) { return k.trim(); }).filter(Boolean);
+      var platforms = ['plat-klook','plat-trip','plat-gyg','plat-kkday']
+        .filter(function(id) { return document.getElementById(id).checked; })
+        .map(function(id) { return document.getElementById(id).value; });
+
+      var msgEl = document.getElementById('poi-form-msg');
+      msgEl.classList.add('hidden');
+
+      if (!name) { showFormMsg('Name is required.'); return; }
+      if (keywords.length === 0) { showFormMsg('At least one keyword is required.'); return; }
+      if (platforms.length === 0) { showFormMsg('Select at least one platform.'); return; }
+
+      var btn = document.getElementById('add-poi-btn');
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
+
+      try {
+        var res = await fetch('/api/pois', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, keywords: keywords, platforms: platforms })
+        });
+        if (!res.ok) {
+          var body = await res.json().catch(function() { return {}; });
+          throw new Error(body.error || 'Failed to add POI');
+        }
+        document.getElementById('poi-name').value = '';
+        document.getElementById('poi-keywords').value = '';
+        await loadPois();
+      } catch (err) {
+        showFormMsg(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Add POI';
+      }
+    }
+
+    function showFormMsg(msg) {
+      var el = document.getElementById('poi-form-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // ─── Delete POI ───────────────────────────────────────────────────────────
+    async function deletePoi(name) {
+      if (!confirm('Delete POI "' + name + '"?')) return;
+      try {
+        var res = await fetch('/api/pois/' + encodeURIComponent(name), { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete');
+        await loadPois();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // ─── Run Compare ──────────────────────────────────────────────────────────
+    async function runCompare() {
+      var name = document.getElementById('compare-poi').value;
+      var date = document.getElementById('compare-date').value;
+      var errEl = document.getElementById('compare-error');
+      errEl.classList.add('hidden');
+
+      if (!name) { showCompareError('Please select a POI.'); return; }
+      if (!date) { showCompareError('Please select a date.'); return; }
+
+      var btn = document.getElementById('run-compare-btn');
+      var loadingEl = document.getElementById('compare-loading');
+
+      btn.disabled = true;
+      loadingEl.classList.remove('hidden');
+
+      try {
+        var res = await fetch('/api/compare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, date: date, save: true })
+        });
+        if (!res.ok) {
+          var body = await res.json().catch(function() { return {}; });
+          throw new Error(body.error || 'Compare failed');
+        }
+        var result = await res.json();
+        renderResults(result);
+      } catch (err) {
+        showCompareError(err.message);
+      } finally {
+        btn.disabled = false;
+        loadingEl.classList.add('hidden');
+      }
+    }
+
+    function showCompareError(msg) {
+      var el = document.getElementById('compare-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // ─── Render Results ───────────────────────────────────────────────────────
+    function renderResults(result) {
+      var section = document.getElementById('results-section');
+      section.classList.remove('hidden');
+
+      var metaEl = document.getElementById('results-meta');
+      metaEl.textContent = (result.query || '') + ' \u00B7 ' + (result.date || '');
+
+      var bodyEl = document.getElementById('results-body');
+      clearChildren(bodyEl);
+
+      var groups = result.groups || [];
+      if (groups.length === 0) {
+        bodyEl.appendChild(makePlaceholder('No groups returned.'));
+      } else {
+        groups.forEach(function(g) {
+          bodyEl.appendChild(buildGroupCard(g));
+        });
+      }
+
+      var footerEl = document.getElementById('results-footer');
+      footerEl.textContent = result.currency_rates_used
+        ? 'Currency rates: ' + result.currency_rates_used
+        : '';
+
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function buildGroupCard(group) {
+      var card = mk('div', 'px-5 py-5');
+
+      append(card,
+        makeText('p', 'text-sm font-semibold text-gray-900', group.group_name)
+      );
+
+      if (group.description) {
+        append(card,
+          makeText('p', 'text-xs text-gray-400 mt-0.5 mb-3', group.description)
+        );
+      } else {
+        append(card, mk('div', 'mb-3'));
+      }
+
+      var tableWrap = mk('div', 'overflow-x-auto rounded border border-gray-100');
+      var table = mk('table', 'w-full border-collapse text-left');
+
+      // thead
+      var thead = mk('thead');
+      var headRow = mk('tr', 'bg-gray-50 border-b border-gray-100');
+      ['Platform','Price (USD)','Original','Rating','Reviews','Notes','Link'].forEach(function(label) {
+        var th = makeText('th', 'px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide', label);
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      // tbody
+      var tbody = mk('tbody', 'divide-y divide-gray-50');
+      (group.products || []).forEach(function(p) {
+        tbody.appendChild(buildProductRow(p, group.cheapest, group.best_rated));
+      });
+      table.appendChild(tbody);
+
+      tableWrap.appendChild(table);
+      card.appendChild(tableWrap);
+      return card;
+    }
+
+    function buildProductRow(p, cheapest, bestRated) {
+      var tr = mk('tr', 'hover:bg-gray-50');
+
+      // Platform cell
+      var platformTd = mk('td', 'px-4 py-3 text-sm whitespace-nowrap');
+      var platformName = makeText('span', 'font-medium', p.platform);
+      platformTd.appendChild(platformName);
+
+      if (p.platform && p.platform === cheapest) {
+        var badge = makeText('span', 'inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 ml-1', 'cheapest');
+        platformTd.appendChild(badge);
+      }
+      if (p.platform && p.platform === bestRated) {
+        var badge2 = makeText('span', 'inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 ml-1', 'best rated');
+        platformTd.appendChild(badge2);
+      }
+
+      // Price USD cell
+      var priceTd = mk('td', 'px-4 py-3 text-sm font-mono-cell whitespace-nowrap');
+      if (p.price_usd != null) {
+        priceTd.textContent = '$' + Number(p.price_usd).toFixed(2);
+      } else {
+        var dash = makeText('span', 'text-gray-300', '\u2014');
+        priceTd.appendChild(dash);
+      }
+
+      // Original price
+      var origTd = makeText('td', 'px-4 py-3 text-sm font-mono-cell whitespace-nowrap text-gray-500', p.price_original || '\u2014');
+
+      // Rating
+      var ratingTd = makeText('td', 'px-4 py-3 text-sm whitespace-nowrap', p.rating || '\u2014');
+
+      // Reviews
+      var reviewsTd = makeText('td', 'px-4 py-3 text-sm whitespace-nowrap text-gray-500', p.review_count || '\u2014');
+
+      // Notes
+      var notesTd = makeText('td', 'px-4 py-3 text-sm text-gray-500 max-w-xs', p.notes || '');
+
+      // Link
+      var linkTd = mk('td', 'px-4 py-3 text-sm');
+      if (p.url) {
+        var link = mk('a', 'text-black underline underline-offset-2 hover:text-gray-600');
+        link.textContent = 'view';
+        link.href = p.url;
+        attr(link, 'target', '_blank');
+        attr(link, 'rel', 'noopener noreferrer');
+        linkTd.appendChild(link);
+      } else {
+        linkTd.appendChild(makeText('span', 'text-gray-300', '\u2014'));
+      }
+
+      append(tr, platformTd, priceTd, origTd, ratingTd, reviewsTd, notesTd, linkTd);
+      return tr;
+    }
+
+    // ─── History ──────────────────────────────────────────────────────────────
+    async function loadHistory() {
+      var name = document.getElementById('history-poi').value;
+      var days = document.getElementById('history-days').value;
+      var errEl = document.getElementById('history-error');
+      var bodyEl = document.getElementById('history-body');
+      errEl.classList.add('hidden');
+
+      if (!name) {
+        errEl.textContent = 'Please select a POI.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      clearChildren(bodyEl);
+      bodyEl.appendChild(makePlaceholder('Loading...'));
+
+      try {
+        var res = await fetch('/api/history/' + encodeURIComponent(name) + '?days=' + encodeURIComponent(days));
+        if (!res.ok) {
+          var body = await res.json().catch(function() { return {}; });
+          throw new Error(body.error || 'Failed to load history');
+        }
+        var runs = await res.json();
+        renderHistory(runs, bodyEl);
+      } catch (err) {
+        clearChildren(bodyEl);
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    function renderHistory(runs, bodyEl) {
+      clearChildren(bodyEl);
+
+      if (!runs || runs.length === 0) {
+        bodyEl.appendChild(makePlaceholder('No runs found for the selected period.'));
+        return;
+      }
+
+      runs.forEach(function(run) {
+        var result = run.result || {};
+        var groups = result.groups || [];
+
+        var card = mk('div', 'px-5 py-4');
+
+        var header = mk('div', 'flex items-center gap-2 mb-3');
+        append(header,
+          makeText('span', 'text-xs font-semibold text-gray-900', fmtTimestamp(run.run_at)),
+          makeText('span', 'text-xs text-gray-400 font-mono-cell', run.date || '')
+        );
+        card.appendChild(header);
+
+        if (groups.length === 0) {
+          card.appendChild(makeText('p', 'text-xs text-gray-400', 'No groups in this run.'));
+        } else {
+          groups.forEach(function(g) {
+            var groupDiv = mk('div', 'mb-2');
+            groupDiv.appendChild(makeText('p', 'text-xs font-semibold text-gray-700 mb-1', g.group_name));
+
+            var pricesRow = mk('p', 'text-xs text-gray-500 flex flex-wrap items-center gap-2');
+            (g.products || []).forEach(function(p, idx) {
+              if (idx > 0) {
+                pricesRow.appendChild(makeText('span', 'text-gray-200', '|'));
+              }
+              var wrap = mk('span', 'inline-flex items-center gap-1');
+              wrap.appendChild(makeText('span', 'font-medium text-gray-700', p.platform));
+              if (p.price_usd != null) {
+                wrap.appendChild(makeText('span', 'font-mono-cell', '$' + Number(p.price_usd).toFixed(2)));
+              } else {
+                wrap.appendChild(makeText('span', 'text-gray-300', '\u2014'));
+              }
+              pricesRow.appendChild(wrap);
+            });
+
+            groupDiv.appendChild(pricesRow);
+            card.appendChild(groupDiv);
+          });
+        }
+
+        bodyEl.appendChild(card);
+      });
+    }
+
+    // ─── Boot ─────────────────────────────────────────────────────────────────
+    loadPois();
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import type { KlookActivity, KlookDetail, KlookItineraryStep, KlookPackage } from './types.js';
+import type { ActivitySection, KlookActivity, KlookDetail, KlookItineraryStep, KlookPackage } from './types.js';
 
 function str(value: unknown): string {
   return value == null ? '' : String(value).trim();
@@ -50,7 +50,7 @@ export function parseTrendingResults(raw: unknown[], limit: number): KlookActivi
 
 export function parseActivityDetail(raw: unknown): KlookDetail {
   if (raw == null || typeof raw !== 'object') {
-    return { title: '', description: '', city: '', category: '', rating: '', review_count: '', images: [], itinerary: [], packages: [], url: '' };
+    return { title: '', description: '', city: '', category: '', rating: '', review_count: '', images: [], itinerary: [], packages: [], sections: [], url: '' };
   }
   const r = raw as Record<string, unknown>;
 
@@ -77,6 +77,14 @@ export function parseActivityDetail(raw: unknown): KlookDetail {
       }))
     : [];
 
+  const sections: ActivitySection[] = Array.isArray(r.sections)
+    ? r.sections.map((s: any) => ({
+        title: str(s.title ?? s.standard),
+        original_title: str(s.original_title ?? s.original),
+        content: str(s.content),
+      })).filter((s: ActivitySection) => s.content)
+    : [];
+
   return {
     title: str(r.title),
     description: str(r.description),
@@ -87,6 +95,7 @@ export function parseActivityDetail(raw: unknown): KlookDetail {
     images: Array.isArray(r.images) ? r.images.map(str).filter(Boolean) : [],
     itinerary,
     packages,
+    sections,
     url: str(r.url),
   };
 }

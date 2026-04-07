@@ -3,638 +3,1506 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>klook-cli — Competitor Monitor</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Travel Competitor Monitor — Price Intelligence CLI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-    .font-mono-cell { font-family: 'Courier New', Courier, monospace; }
-    .spinner {
-      display: inline-block;
-      width: 1rem;
-      height: 1rem;
-      border: 2px solid #e5e7eb;
-      border-top-color: #111827;
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep: #07080a;
+      --bg-surface: #101111;
+      --bg-card: #1b1c1e;
+      --text-primary: #ffffff;
+      --text-secondary: #c0c0c0;
+      --text-dim: #9c9c9d;
+      --text-muted: #6a6b6c;
+      --accent-red: #FF6363;
+      --accent-blue: hsl(202, 100%, 67%);
+      --accent-green: hsl(151, 59%, 59%);
+      --accent-yellow: hsl(43, 100%, 60%);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-dark: #2f3031;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: Inter, system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 15px;
+      letter-spacing: 0.2px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Lang toggle ── */
+    body[data-active-lang="en"] [data-lang="zh"] { display: none; }
+    body[data-active-lang="zh"] [data-lang="en"] { display: none; }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7, 8, 10, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      gap: 12px;
+    }
+
+    .nav-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 86px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      transition: opacity 0.15s ease;
+      box-shadow: rgba(255,255,255,0.1) 0px 1px 0px 0px inset;
+    }
+    .btn:hover { opacity: 0.6; }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: #07080a;
+    }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.08);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-sm {
+      padding: 5px 14px;
+      font-size: 12px;
+    }
+
+    /* lang toggle buttons */
+    .lang-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      border-radius: 86px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      letter-spacing: 0.3px;
+    }
+    .lang-btn:hover { color: var(--text-secondary); }
+    .lang-btn.active {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.08);
+      border-color: var(--border);
+    }
+
+    .lang-divider {
+      color: var(--border-dark);
+      font-size: 12px;
+      user-select: none;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 96px 0 80px;
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      background: rgba(255,99,99,0.1);
+      border: 1px solid rgba(255,99,99,0.2);
+      border-radius: 86px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-red);
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 700;
+      line-height: 1.12;
+      letter-spacing: -0.5px;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+    }
+
+    .hero-subtitle {
+      font-size: 17px;
+      color: var(--text-secondary);
+      max-width: 580px;
+      margin: 0 auto 40px;
+      line-height: 1.65;
+    }
+
+    .hero-ctas {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Section ── */
+    section {
+      padding: 72px 0;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text-primary);
+      margin-bottom: 40px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .card-header-icon {
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      letter-spacing: -0.1px;
+    }
+
+    .card-body {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    /* ── 3-col grid ── */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    /* ── 2x2 grid ── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    /* ── Platform table ── */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+      padding: 14px 16px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover td {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .td-platform {
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .check {
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .dash {
+      color: var(--text-muted);
+    }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 20px 20px 20px;
+      overflow-x: auto;
+      font-family: ui-monospace, "SFMono-Regular", monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      position: relative;
+    }
+
+    code {
+      font-family: ui-monospace, "SFMono-Regular", monospace;
+    }
+
+    pre code {
+      display: block;
+      padding-right: 60px; /* room for copy btn */
+    }
+
+    .tok-comment { color: var(--text-muted); }
+    .tok-cmd     { color: var(--accent-blue); }
+    .tok-flag    { color: var(--accent-green); }
+    .tok-str     { color: var(--accent-yellow); }
+    .tok-plain   { color: var(--text-secondary); }
+
+    /* ── Copy button ── */
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+    /* ── Install card ── */
+    .install-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .install-card .install-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    .install-card pre {
+      text-align: left;
+      margin: 0 auto;
+      max-width: 680px;
+      font-size: 14px;
+    }
+
+    /* ── Setup guide (details) ── */
+    .setup-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    details {
+      border-bottom: 1px solid var(--border);
+    }
+
+    details:last-child {
+      border-bottom: none;
+    }
+
+    summary {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 24px;
+      cursor: pointer;
+      list-style: none;
+      background: var(--bg-surface);
+      transition: background 0.15s ease;
+      user-select: none;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    summary:hover {
+      background: rgba(255,255,255,0.03);
+    }
+
+    details[open] summary {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    .step-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .chevron {
+      color: var(--text-muted);
+      font-size: 12px;
+      transition: transform 0.2s ease;
+    }
+
+    details[open] .chevron {
+      transform: rotate(180deg);
+    }
+
+    .step-content {
+      background: var(--bg-deep);
+      padding: 20px 24px;
+    }
+
+    .step-content p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+      line-height: 1.65;
+    }
+
+    .step-content pre {
+      margin-bottom: 0;
+      background: var(--bg-surface);
+    }
+
+    .step-content p + pre {
+      margin-top: 0;
+    }
+
+    /* ── Info card ── */
+    .info-card {
+      background: rgba(55, 120, 200, 0.06);
+      border: 1px solid rgba(55, 160, 255, 0.12);
+      border-radius: 12px;
+      padding: 24px 28px;
+    }
+
+    .info-card-icon {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .info-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .footer-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .footer-links a:hover { opacity: 0.6; }
+
+    .footer-sep {
+      color: var(--border-dark);
+    }
+
+    /* ── Claude Code examples ── */
+    .claude-examples {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .claude-example-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .user-bubble {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .user-bubble-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .user-bubble-text {
+      display: inline-block;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    .user-bubble .prompt-copy-btn {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .user-bubble .prompt-copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+    .result-block {
+      background: #101111;
+      padding: 16px 20px 20px;
+      position: relative;
+    }
+
+    .result-block-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--accent-green);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .result-block-label::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+    }
+
+    .result-block.no-copy-btn .copy-btn {
+      display: none;
+    }
+
+    .result-block pre {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .result-block pre code {
+      padding-right: 0;
+    }
+
+    /* ── Claude Code prompt card ── */
+    .prompt-card {
+      background: rgba(99, 179, 255, 0.04);
+      border: 1px solid rgba(99, 179, 255, 0.15);
+      border-radius: 16px;
+      padding: 32px 36px;
+    }
+
+    .prompt-card-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent-blue);
+      margin-bottom: 12px;
+    }
+
+    .prompt-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      letter-spacing: -0.2px;
+    }
+
+    .prompt-card pre {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: 0;
+    }
+
+    /* ── Collapsible engineer setup ── */
+    .engineer-setup-toggle {
+      display: block;
+      width: 100%;
+      text-align: left;
+    }
+
+    .engineer-setup-toggle > summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 0;
+      border-bottom: none;
+    }
+
+    .engineer-setup-toggle > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .engineer-setup-toggle > summary:hover {
+      background: transparent;
+    }
+
+    .engineer-setup-toggle[open] > summary .engineer-chevron {
+      transform: rotate(90deg);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 720px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .hero { padding: 64px 0 56px; }
+      .install-card { padding: 28px 20px; }
+      section { padding: 56px 0; }
+      .prompt-card { padding: 24px 20px; }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 28px; }
+      .nav-title { font-size: 13px; }
+    }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
+<body data-active-lang="en">
 
-  <!-- Header -->
-  <header class="border-b border-gray-200 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-      <span class="font-mono text-sm font-bold tracking-tight bg-black text-white px-2 py-0.5 rounded">klook-cli</span>
-      <span class="text-gray-400 text-sm font-medium">Competitor Monitor</span>
-    </div>
-  </header>
-
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-
-    <!-- Top row: POI Management + Compare Controls -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      <!-- POI Management (1 col) -->
-      <div class="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-        <div class="px-5 py-4 border-b border-gray-100">
-          <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">POI Management</h2>
-        </div>
-
-        <div id="poi-list" class="divide-y divide-gray-50 flex-1 overflow-y-auto max-h-80">
-          <div class="px-5 py-3 text-sm text-gray-400">Loading...</div>
-        </div>
-
-        <div class="px-5 py-4 border-t border-gray-100 space-y-3">
-          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add POI</p>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">Name</label>
-            <input
-              id="poi-name"
-              type="text"
-              placeholder="e.g. Eiffel Tower Skip-the-Line"
-              class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black placeholder-gray-300"
-            />
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">Keywords <span class="text-gray-400 font-normal">(one per line)</span></label>
-            <textarea
-              id="poi-keywords"
-              rows="3"
-              placeholder="eiffel tower&#10;skip the line&#10;summit access"
-              class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black placeholder-gray-300 resize-none"
-            ></textarea>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">Platforms</label>
-            <div class="flex flex-wrap gap-3">
-              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" id="plat-klook" value="klook" checked class="accent-black" /> Klook
-              </label>
-              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" id="plat-trip" value="trip.com" checked class="accent-black" /> Trip.com
-              </label>
-              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" id="plat-gyg" value="getyourguide" checked class="accent-black" /> GYG
-              </label>
-              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" id="plat-kkday" value="kkday" checked class="accent-black" /> KKday
-              </label>
-            </div>
-          </div>
-          <button
-            id="add-poi-btn"
-            onclick="addPoi()"
-            class="w-full bg-black text-white text-sm font-medium py-2 rounded hover:bg-gray-800 active:bg-gray-900 transition-colors"
-          >
-            Add POI
-          </button>
-          <p id="poi-form-msg" class="text-xs text-red-500 hidden"></p>
-        </div>
-      </div>
-
-      <!-- Compare Controls (2 cols) -->
-      <div class="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-        <div class="px-5 py-4 border-b border-gray-100">
-          <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">Run Comparison</h2>
-        </div>
-
-        <div class="px-5 py-6 space-y-5 flex-1">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">POI</label>
-              <select id="compare-poi" class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black bg-white">
-                <option value="">— select a POI —</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">Date</label>
-              <input id="compare-date" type="date" class="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black" />
-            </div>
-          </div>
-
-          <button
-            id="run-compare-btn"
-            onclick="runCompare()"
-            class="bg-black text-white text-sm font-medium px-6 py-2 rounded hover:bg-gray-800 active:bg-gray-900 transition-colors"
-          >
-            Run Compare
-          </button>
-
-          <div id="compare-loading" class="hidden flex items-start gap-3 bg-gray-50 border border-gray-200 rounded p-4">
-            <div class="spinner mt-0.5 flex-shrink-0"></div>
-            <p class="text-sm text-gray-600">Searching platforms &amp; clustering with AI... this may take 1&ndash;2 minutes</p>
-          </div>
-
-          <p id="compare-error" class="hidden text-sm text-red-500"></p>
-        </div>
+<!-- ══════════════════════════════════
+     1. NAV
+══════════════════════════════════ -->
+<nav>
+  <div class="container">
+    <div class="nav-inner">
+      <span class="nav-title">Travel Competitor Monitor</span>
+      <div class="nav-right">
+        <button class="lang-btn active" id="btn-en" onclick="setLang('en')">EN</button>
+        <span class="lang-divider">|</span>
+        <button class="lang-btn" id="btn-zh" onclick="setLang('zh')">中文</button>
+        <a href="/dashboard.html" class="btn btn-ghost btn-sm" style="margin-left:6px;">
+          <span data-lang="en">Open Dashboard</span>
+          <span data-lang="zh">開啟儀表板</span>
+        </a>
       </div>
     </div>
+  </div>
+</nav>
 
-    <!-- Results (full width) -->
-    <div id="results-section" class="hidden bg-white border border-gray-200 rounded-lg shadow-sm">
-      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">Results</h2>
-        <div id="results-meta" class="text-sm text-gray-400 font-mono-cell"></div>
-      </div>
-      <div id="results-body" class="divide-y divide-gray-100"></div>
-      <div id="results-footer" class="px-5 py-3 text-xs text-gray-400 border-t border-gray-100"></div>
+
+<!-- ══════════════════════════════════
+     2. HERO
+══════════════════════════════════ -->
+<div class="container">
+  <div class="hero">
+    <div class="hero-eyebrow">
+      <span>Klook Internal Tool</span>
     </div>
 
-    <!-- History (full width) -->
-    <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
-      <div class="px-5 py-4 border-b border-gray-100">
-        <h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">History</h2>
+    <h1>
+      <span data-lang="en">Cross-Platform Travel<br>Price Intelligence</span>
+      <span data-lang="zh">跨平台旅遊產品價格監控</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      <span data-lang="en">Compare activities across Klook, Trip.com, GetYourGuide, and KKday — with AI-powered clustering and price tracking.</span>
+      <span data-lang="zh">跨平台搜尋 Klook、Trip.com、GetYourGuide、KKday 的活動產品，AI 自動分組比價並追蹤價格變動。</span>
+    </p>
+
+    <div class="hero-ctas">
+      <a href="/dashboard.html" class="btn btn-primary">
+        <span data-lang="en">Open Dashboard</span>
+        <span data-lang="zh">開啟儀表板</span>
+      </a>
+      <a href="https://github.com/ryanhuang1109/klook-cli" target="_blank" rel="noopener" class="btn btn-ghost">
+        GitHub
+      </a>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+     3. HOW IT WORKS
+══════════════════════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">
+      <span data-lang="en">How It Works</span>
+      <span data-lang="zh">運作原理</span>
+    </div>
+    <div class="section-title">
+      <span data-lang="en">Three layers, one command</span>
+      <span data-lang="zh">三個層次，一行指令</span>
+    </div>
+
+    <div class="grid-3">
+      <!-- Card 1 -->
+      <div class="card">
+        <div class="card-header-icon">🔌</div>
+        <div class="card-title">
+          <span data-lang="en">Browser Bridge</span>
+          <span data-lang="zh">Browser Bridge</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">Powered by opencli, this tool uses a Chrome extension to borrow your existing login sessions. No credentials stored — if your Chrome is logged into a website, the tool can access it just like you would.</span>
+          <span data-lang="zh">基於 opencli 框架，透過 Chrome 擴充程式借用你的瀏覽器登入 session。不需要提供帳號密碼 — 只要 Chrome 有登入該網站，工具就能像你一樣操作。</span>
+        </div>
       </div>
 
-      <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-end gap-3">
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">POI</label>
-          <select id="history-poi" class="text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black bg-white">
-            <option value="">— select a POI —</option>
-          </select>
+      <!-- Card 2 -->
+      <div class="card">
+        <div class="card-header-icon">🔍</div>
+        <div class="card-title">
+          <span data-lang="en">Search 4 Platforms</span>
+          <span data-lang="zh">搜尋 4 個平台</span>
         </div>
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">Days</label>
-          <select id="history-days" class="text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-black bg-white">
-            <option value="7">Last 7 days</option>
-            <option value="14">Last 14 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
+        <div class="card-body">
+          <span data-lang="en">Simultaneously search Klook, Trip.com, GetYourGuide, and KKday. Each platform's activities, prices, ratings, and reviews are extracted in real-time.</span>
+          <span data-lang="zh">同時搜尋 Klook、Trip.com、GetYourGuide、KKday。即時抓取各平台的活動、價格、評分、評論數。</span>
         </div>
-        <button
-          onclick="loadHistory()"
-          class="bg-black text-white text-sm font-medium px-5 py-1.5 rounded hover:bg-gray-800 active:bg-gray-900 transition-colors"
-        >
-          Load
-        </button>
-        <p id="history-error" class="hidden text-xs text-red-500"></p>
       </div>
 
-      <div id="history-body" class="divide-y divide-gray-100">
-        <div class="px-5 py-4 text-sm text-gray-400">Select a POI and click Load to view history.</div>
+      <!-- Card 3 -->
+      <div class="card">
+        <div class="card-header-icon">🤖</div>
+        <div class="card-title">
+          <span data-lang="en">AI Clustering</span>
+          <span data-lang="zh">AI 自動分組</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">Results from all platforms are sent to AI (Claude via OpenRouter) that groups similar products, converts currencies to USD, and identifies the best price and highest rated option.</span>
+          <span data-lang="zh">將所有平台的結果送給 AI（Claude via OpenRouter），自動將相似產品分組、統一幣別為 USD、標出每組最低價和最高評分。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     4. SUPPORTED PLATFORMS
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
+    <div class="section-label">
+      <span data-lang="en">Coverage</span>
+      <span data-lang="zh">支援平台</span>
+    </div>
+    <div class="section-title">
+      <span data-lang="en">Supported Platforms</span>
+      <span data-lang="zh">支援的平台</span>
+    </div>
+
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="table-wrap">
+        <!-- EN table -->
+        <table data-lang="en">
+          <thead>
+            <tr>
+              <th>Platform</th>
+              <th>Search</th>
+              <th>Detail</th>
+              <th>Pricing</th>
+              <th>Date Compare</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-platform">Klook</td>
+              <td class="tok-plain">Public API</td>
+              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="check">✓</td>
+              <td class="dash">—</td>
+            </tr>
+            <tr>
+              <td class="td-platform">Trip.com</td>
+              <td class="tok-plain">Browser</td>
+              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="check">✓</td>
+              <td class="check">✓</td>
+            </tr>
+            <tr>
+              <td class="td-platform">GetYourGuide</td>
+              <td class="tok-plain">Browser</td>
+              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="check">✓</td>
+              <td class="dash">—</td>
+            </tr>
+            <tr>
+              <td class="td-platform">KKday</td>
+              <td class="tok-plain">Browser</td>
+              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="check">✓</td>
+              <td class="dash">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ZH table -->
+        <table data-lang="zh">
+          <thead>
+            <tr>
+              <th>平台</th>
+              <th>搜尋</th>
+              <th>詳情</th>
+              <th>價格</th>
+              <th>日期比較</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-platform">Klook</td>
+              <td class="tok-plain">Public API</td>
+              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="check">✓</td>
+              <td class="dash">—</td>
+            </tr>
+            <tr>
+              <td class="td-platform">Trip.com</td>
+              <td class="tok-plain">Browser</td>
+              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="check">✓</td>
+              <td class="check">✓</td>
+            </tr>
+            <tr>
+              <td class="td-platform">GetYourGuide</td>
+              <td class="tok-plain">Browser</td>
+              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="check">✓</td>
+              <td class="dash">—</td>
+            </tr>
+            <tr>
+              <td class="td-platform">KKday</td>
+              <td class="tok-plain">Browser</td>
+              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="check">✓</td>
+              <td class="dash">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     5. FEATURES
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
+    <div class="section-label">
+      <span data-lang="en">Features</span>
+      <span data-lang="zh">功能特色</span>
+    </div>
+    <div class="section-title">
+      <span data-lang="en">Everything you need for competitor analysis</span>
+      <span data-lang="zh">競品分析所需的一切</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header-icon">📊</div>
+        <div class="card-title">
+          <span data-lang="en">POI Monitoring</span>
+          <span data-lang="zh">POI 監控</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">Configure Points of Interest with custom keywords per platform</span>
+          <span data-lang="zh">設定監控景點，每個平台可設定不同搜尋關鍵字</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-icon">💰</div>
+        <div class="card-title">
+          <span data-lang="en">Price Comparison</span>
+          <span data-lang="zh">跨平台比價</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">AI groups similar products, normalizes to USD, highlights cheapest and best-rated</span>
+          <span data-lang="zh">AI 自動分組、統一幣別、標出最優選擇</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-icon">📈</div>
+        <div class="card-title">
+          <span data-lang="en">Historical Tracking</span>
+          <span data-lang="zh">歷史追蹤</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">Save comparisons to local database, track price changes over days/weeks</span>
+          <span data-lang="zh">比價結果存入資料庫，追蹤每日價格變動</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-icon">🌐</div>
+        <div class="card-title">
+          <span data-lang="en">Web Dashboard</span>
+          <span data-lang="zh">Web 介面</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">BD colleagues use the web interface — no terminal needed</span>
+          <span data-lang="zh">BD 同事不需要 terminal，瀏覽器直接操作</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-icon">📋</div>
+        <div class="card-title">
+          <span data-lang="en">Full Page Extraction</span>
+          <span data-lang="zh">完整頁面擷取</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">Extracts all page sections (What to expect, Inclusions, Itinerary, Cancellation policy, etc.) with standardised titles across platforms</span>
+          <span data-lang="zh">擷取頁面所有段落（行程介紹、包含項目、取消政策等），跨平台標題統一標準化，方便比對</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-icon">🏷️</div>
+        <div class="card-title">
+          <span data-lang="en">Standardised Section Names</span>
+          <span data-lang="zh">標準化段落名稱</span>
+        </div>
+        <div class="card-body">
+          <span data-lang="en">Section titles normalised to Klook naming (e.g. GYG "Includes" → "What's included"), with original platform name preserved for reference</span>
+          <span data-lang="zh">段落標題統一為 Klook 命名規範（如 GYG "Includes" → "What's included"），同時保留各平台原始標題供參考</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     6. USE WITH CLAUDE CODE
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
+    <div class="section-label">
+      <span data-lang="en">Use with Claude Code</span>
+      <span data-lang="zh">透過 Claude Code 使用</span>
+    </div>
+    <div class="section-title">
+      <span data-lang="en">Use with Claude Code</span>
+      <span data-lang="zh">透過 Claude Code 使用</span>
+    </div>
+
+    <p style="font-size:15px; color:var(--text-secondary); margin-bottom:32px; line-height:1.65;">
+      <span data-lang="en">After installation, open the project in Claude Code and ask in natural language:</span>
+      <span data-lang="zh">安裝完成後，用 Claude Code 開啟專案目錄，直接用自然語言問：</span>
+    </p>
+
+    <div class="claude-examples">
+
+      <!-- Example 1 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Find Mt Fuji day tours and compare prices across all platforms</span>
+            <span data-lang="zh">幫我找富士山一日遊，四個平台比價</span>
+          </div>
+        </div>
+        <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
+          <pre><code><span class="tok-plain">Classic Mt. Fuji Day Tour (6 spots, ~10 hours)
+
+</span><span class="tok-comment">Platform     Price (USD)  Rating  Reviews</span>
+<span class="tok-flag">Trip.com     $41.88       4.8     5,422    ← cheapest</span>
+<span class="tok-plain">KKday        $45.06       4.8     5,561</span>
+<span class="tok-plain">Klook        $51.45       4.8     28,200+</span><span class="tok-comment">  ← most reviewed</span>
+<span class="tok-plain">GYG          $75.00       4.7     4,980</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Example 2 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Show me USJ ticket details and package options on Klook</span>
+            <span data-lang="zh">查一下 Klook 上 USJ 門票的套餐和價格</span>
+          </div>
+        </div>
+        <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
+          <pre><code><span class="tok-plain">Universal Studios Japan Studio Pass</span>
+<span class="tok-str">★ 4.8 | 84.9K reviews</span>
+
+<span class="tok-comment">Package                              Price</span>
+<span class="tok-plain">1-Day Studio Pass                    US$ 55.80</span>
+<span class="tok-plain">1-Day + Nintendo World + Kansai      US$ 91.60</span>
+<span class="tok-plain">VIP Private Tour (incl. lunch)       US$ 1,554.05</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Example 3 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Compare Trip.com Mt Fuji tour prices for the next 3 days</span>
+            <span data-lang="zh">看一下 Trip.com 富士山 tour 未來三天的價格差異</span>
+          </div>
+        </div>
+        <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
+          <pre><code><span class="tok-comment">Mon, Apr 7                           Tue, Apr 8</span>
+<span class="tok-plain">Standard group    $41.88  </span><span class="tok-flag">✓</span><span class="tok-plain">          $41.88  </span><span class="tok-flag">✓</span>
+<span class="tok-plain">Small group       $59.03  </span><span class="tok-flag">✓</span><span class="tok-plain">          $59.03  </span><span class="tok-flag">✓</span>
+<span class="tok-plain">Alphard charter   $57.53  </span><span class="tok-str">✗ sold</span><span class="tok-plain">     $57.53  </span><span class="tok-flag">✓</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Example 4 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Track price changes for Mt Fuji tours over the past week</span>
+            <span data-lang="zh">追蹤富士山 tour 過去一週的價格變動</span>
+          </div>
+        </div>
+        <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
+          <pre><code><span class="tok-plain">Mt Fuji day tour — price history (7 days)
+
+</span><span class="tok-plain">Classic Tour:</span>
+<span class="tok-plain">  Trip.com:  $41.88 → $41.88 → </span><span class="tok-str">$43.20 (↑ $1.32)</span>
+<span class="tok-plain">  KKday:     $45.06 </span><span class="tok-comment">(no change)</span>
+<span class="tok-plain">  Klook:     $51.45 </span><span class="tok-comment">(no change)</span></code></pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     8. GETTING STARTED GUIDE
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
+    <div class="section-label">
+      <span data-lang="en">Getting Started</span>
+      <span data-lang="zh">開始使用</span>
+    </div>
+    <div class="section-title" style="margin-bottom: 32px;">
+      <span data-lang="en">5 Minutes to Get Started</span>
+      <span data-lang="zh">5 分鐘快速上手</span>
+    </div>
+
+    <!-- Step 1: Install -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">1</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Install everything with one command</span>
+            <span data-lang="zh">一行指令安裝全部</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">This installs opencli, klook-cli, builds the Browser Bridge extension, and registers all plugins. It will also ask for your OpenRouter API key.</span>
+            <span data-lang="zh">自動安裝 opencli、klook-cli、建構 Browser Bridge 擴充程式、註冊所有平台。最後會詢問你的 OpenRouter API key。</span>
+          </p>
+          <pre style="margin: 0;"><code>curl -fsSL https://raw.githubusercontent.com/ryanhuang1109/klook-cli/main/install.sh | bash</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+            <span data-lang="en">After install, load the Browser Bridge extension in Chrome: chrome://extensions/ → Developer Mode → Load unpacked → select /tmp/opencli-extension/extension</span>
+            <span data-lang="zh">安裝完成後，在 Chrome 載入擴充程式：chrome://extensions/ → 開發者模式 → 載入未封裝項目 → 選擇 /tmp/opencli-extension/extension</span>
+          </p>
+        </div>
       </div>
     </div>
 
-  </main>
+    <!-- Step 2: Open project in Claude Code -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">2</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Open the project in Claude Code</span>
+            <span data-lang="zh">用 Claude Code 開啟專案目錄</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Claude Code will automatically read CLAUDE.md and understand all available commands.</span>
+            <span data-lang="zh">Claude Code 會自動讀取 CLAUDE.md，了解所有可用指令。</span>
+          </p>
+          <pre style="margin: 0;"><code>cd ~/klook-cli && claude</code></pre>
+        </div>
+      </div>
+    </div>
 
-  <script>
-    // ─── XSS prevention helper (required for any innerHTML usage) ─────────────
-    function esc(s) {
-      if (!s) return '';
-      const d = document.createElement('div');
-      d.textContent = String(s);
-      return d.innerHTML;
-    }
+    <!-- Step 3: Set OpenRouter API key -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">3</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Set your OpenRouter API key (for AI comparison)</span>
+            <span data-lang="zh">設定 OpenRouter API key（AI 比價功能需要）</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.6;">
+            <span data-lang="en">Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a>, then run:</span>
+            <span data-lang="zh">先到 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a> 取得 key，然後執行：</span>
+          </p>
+          <pre style="margin: 0;"><code>mkdir -p ~/.klook-cli
+echo '{"openrouter_api_key":"YOUR-KEY-HERE"}' > ~/.klook-cli/config.json</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+            <span data-lang="en">Skip this step if you already set the key during installation.</span>
+            <span data-lang="zh">如果安裝時已經設定過，可以跳過這步。</span>
+          </p>
+        </div>
+      </div>
+    </div>
 
-    // ─── Safe DOM builder ──────────────────────────────────────────────────────
-    // Creates elements via DOM APIs — no dynamic innerHTML
-    function mk(tag, cls) {
-      const el = document.createElement(tag);
-      if (cls) el.className = cls;
-      return el;
-    }
+    <!-- Step 4: Verify Browser Bridge -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">4</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Verify Browser Bridge connection</span>
+            <span data-lang="zh">確認 Browser Bridge 已連線</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Make sure Chrome is open with the Browser Bridge extension loaded.</span>
+            <span data-lang="zh">確保 Chrome 已開啟且 Browser Bridge 擴充程式已載入。</span>
+          </p>
+          <pre style="margin: 0;"><code>opencli doctor</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+            <span data-lang="en">You should see: [OK] Daemon: running, [OK] Extension: connected, [OK] Connectivity: connected</span>
+            <span data-lang="zh">應該顯示：[OK] Daemon: running, [OK] Extension: connected, [OK] Connectivity: connected</span>
+          </p>
+        </div>
+      </div>
+    </div>
 
-    function txt(s) {
-      return document.createTextNode(String(s == null ? '' : s));
-    }
+    <!-- Step 5: Start asking -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">5</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Start asking! Use natural language in Claude Code</span>
+            <span data-lang="zh">開始使用！在 Claude Code 中用自然語言提問</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Just tell it what you want. Here are some examples:</span>
+            <span data-lang="zh">直接告訴它你想查什麼，例如：</span>
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <pre style="margin: 0;"><code><span data-lang="en">Find Mt Fuji day tours and compare prices across all platforms</span><span data-lang="zh">幫我找富士山一日遊，四個平台比價</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en">Show me USJ ticket packages and prices on Klook</span><span data-lang="zh">查一下 Klook 上 USJ 門票的套餐和價格</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en">Compare Trip.com Mt Fuji tour prices for the next 3 days</span><span data-lang="zh">看一下 Trip.com 富士山 tour 未來三天的價格差異</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en">Track price changes for Mt Fuji tours over the past week</span><span data-lang="zh">追蹤富士山 tour 過去一週的價格變動</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    function append(parent) {
-      const children = Array.prototype.slice.call(arguments, 1);
-      for (let i = 0; i < children.length; i++) {
-        const c = children[i];
-        if (c != null) parent.appendChild(c);
-      }
-      return parent;
-    }
+  </div>
+</section>
 
-    function attr(el, name, val) {
-      el.setAttribute(name, val);
-      return el;
-    }
 
-    function makeText(tag, cls, content) {
-      const el = mk(tag, cls);
-      el.textContent = content == null ? '' : String(content);
-      return el;
-    }
+<!-- ══════════════════════════════════
+     9. SETUP GUIDE (COLLAPSED)
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
 
-    function makePlaceholder(msg) {
-      const el = mk('div', 'px-5 py-3 text-sm text-gray-400');
-      el.textContent = msg;
-      return el;
-    }
+    <details class="engineer-setup-toggle">
+      <summary style="cursor:pointer; color: var(--text-dim); font-size: 14px; list-style: none; display: flex; align-items: center; gap: 8px; padding: 4px 0; user-select: none; background: transparent;">
+        <span class="engineer-chevron" style="color: var(--text-muted); font-size: 11px; transition: transform 0.2s ease; display: inline-block;">▶</span>
+        <span data-lang="en">Engineer Setup Guide (8 steps)</span>
+        <span data-lang="zh">工程師安裝指南（8 步驟）</span>
+      </summary>
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
-    function today() {
-      return new Date().toISOString().slice(0, 10);
-    }
+      <div style="margin-top: 24px;">
 
-    function fmtTimestamp(iso) {
-      if (!iso) return '';
-      try {
-        return new Date(iso).toLocaleString(undefined, {
-          year: 'numeric', month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit'
+    <div class="setup-steps">
+
+      <!-- Step 1 -->
+      <details>
+        <summary>
+          <span class="step-num">1</span>
+          <span class="step-title">
+            <span data-lang="en">Install opencli</span>
+            <span data-lang="zh">安裝 opencli</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">Install the opencli package globally via npm:</p>
+          <p data-lang="zh">透過 npm 全域安裝 opencli：</p>
+          <pre><code><span class="tok-cmd">npm</span> <span class="tok-plain">install</span> <span class="tok-flag">-g</span> <span class="tok-str">@jackwener/opencli</span></code></pre>
+        </div>
+      </details>
+
+      <!-- Step 2 -->
+      <details>
+        <summary>
+          <span class="step-num">2</span>
+          <span class="step-title">
+            <span data-lang="en">Install Browser Bridge (Chrome Extension)</span>
+            <span data-lang="zh">安裝 Browser Bridge（Chrome 擴充程式）</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">Clone and build the extension:</p>
+          <p data-lang="zh">克隆並建置擴充程式：</p>
+          <pre><code><span class="tok-cmd">git</span> <span class="tok-plain">clone</span> <span class="tok-flag">--depth 1</span> <span class="tok-str">https://github.com/jackwener/opencli.git</span> <span class="tok-plain">/tmp/opencli</span>
+<span class="tok-cmd">cd</span> <span class="tok-plain">/tmp/opencli/extension</span>
+<span class="tok-cmd">npm</span> <span class="tok-plain">install</span>
+<span class="tok-cmd">npm</span> <span class="tok-plain">run build</span></code></pre>
+          <p data-lang="en" style="margin-top:14px;">Then in Chrome: go to <code style="color:var(--accent-blue);">chrome://extensions/</code> → enable Developer Mode → Load unpacked → select <code style="color:var(--accent-yellow);">/tmp/opencli/extension</code></p>
+          <p data-lang="zh" style="margin-top:14px;">然後在 Chrome 中：前往 <code style="color:var(--accent-blue);">chrome://extensions/</code> → 開啟開發人員模式 → 載入未封裝項目 → 選擇 <code style="color:var(--accent-yellow);">/tmp/opencli/extension</code></p>
+        </div>
+      </details>
+
+      <!-- Step 3 -->
+      <details>
+        <summary>
+          <span class="step-num">3</span>
+          <span class="step-title">
+            <span data-lang="en">Verify the installation</span>
+            <span data-lang="zh">驗證安裝</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">Run the diagnostic command to confirm everything is connected:</p>
+          <p data-lang="zh">執行診斷指令確認一切正常連線：</p>
+          <pre><code><span class="tok-cmd">opencli</span> <span class="tok-plain">doctor</span></code></pre>
+        </div>
+      </details>
+
+      <!-- Step 4 -->
+      <details>
+        <summary>
+          <span class="step-num">4</span>
+          <span class="step-title">
+            <span data-lang="en">Clone and build this repo</span>
+            <span data-lang="zh">克隆並建置本 repo</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <pre><code><span class="tok-cmd">git</span> <span class="tok-plain">clone</span> <span class="tok-str">https://github.com/ryanhuang1109/klook-cli.git</span>
+<span class="tok-cmd">cd</span> <span class="tok-plain">klook-cli</span>
+<span class="tok-cmd">npm</span> <span class="tok-plain">install</span>
+<span class="tok-cmd">npm</span> <span class="tok-plain">run build</span></code></pre>
+        </div>
+      </details>
+
+      <!-- Step 5 -->
+      <details>
+        <summary>
+          <span class="step-num">5</span>
+          <span class="step-title">
+            <span data-lang="en">Register plugins with opencli</span>
+            <span data-lang="zh">向 opencli 登錄插件</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">Create symlinks so opencli can find the platform plugins:</p>
+          <p data-lang="zh">建立符號連結讓 opencli 找到各平台插件：</p>
+          <pre><code><span class="tok-cmd">ln</span> <span class="tok-flag">-sf</span> <span class="tok-plain">$PWD/dist/clis/klook ~/.opencli/plugins/klook</span>
+<span class="tok-cmd">ln</span> <span class="tok-flag">-sf</span> <span class="tok-plain">$PWD/dist/clis/trip ~/.opencli/plugins/trip</span>
+<span class="tok-cmd">ln</span> <span class="tok-flag">-sf</span> <span class="tok-plain">$PWD/dist/clis/getyourguide ~/.opencli/plugins/getyourguide</span>
+<span class="tok-cmd">ln</span> <span class="tok-flag">-sf</span> <span class="tok-plain">$PWD/dist/clis/kkday ~/.opencli/plugins/kkday</span></code></pre>
+        </div>
+      </details>
+
+      <!-- Step 6 -->
+      <details>
+        <summary>
+          <span class="step-num">6</span>
+          <span class="step-title">
+            <span data-lang="en">Set OpenRouter API key</span>
+            <span data-lang="zh">設定 OpenRouter API 金鑰</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">Create the config directory and write your API key:</p>
+          <p data-lang="zh">建立設定目錄並寫入 API 金鑰：</p>
+          <pre><code><span class="tok-cmd">mkdir</span> <span class="tok-flag">-p</span> <span class="tok-plain">~/.klook-cli</span>
+<span class="tok-cmd">echo</span> <span class="tok-str">'{"openrouter_api_key":"YOUR-KEY"}'</span> <span class="tok-plain">&gt; ~/.klook-cli/config.json</span></code></pre>
+        </div>
+      </details>
+
+      <!-- Step 7 -->
+      <details>
+        <summary>
+          <span class="step-num">7</span>
+          <span class="step-title">
+            <span data-lang="en">Log into platforms in Chrome</span>
+            <span data-lang="zh">在 Chrome 登入各平台</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">You only need to do this once. Open Chrome and log into these sites manually:</p>
+          <p data-lang="zh">只需要做一次。在 Chrome 手動登入以下網站：</p>
+          <pre><code><span class="tok-str">trip.com</span>
+<span class="tok-str">getyourguide.com</span>
+<span class="tok-str">kkday.com</span></code></pre>
+          <p data-lang="en" style="margin-top:14px;">Klook uses a public API and does not require login.</p>
+          <p data-lang="zh" style="margin-top:14px;">Klook 使用公開 API，不需要登入。</p>
+        </div>
+      </details>
+
+      <!-- Step 8 -->
+      <details>
+        <summary>
+          <span class="step-num">8</span>
+          <span class="step-title">
+            <span data-lang="en">Start using the tool</span>
+            <span data-lang="zh">開始使用</span>
+          </span>
+          <span class="chevron">▾</span>
+        </summary>
+        <div class="step-content">
+          <p data-lang="en">Run a search to confirm everything works, then start the web dashboard:</p>
+          <p data-lang="zh">執行搜尋確認一切正常，然後啟動 web 儀表板：</p>
+          <pre><code><span class="tok-cmd">opencli</span> <span class="tok-plain">klook search</span> <span class="tok-str">"Tokyo"</span> <span class="tok-flag">--limit</span> <span class="tok-plain">5</span>
+
+<span class="tok-comment"># or start the web dashboard</span>
+<span class="tok-cmd">npm</span> <span class="tok-plain">run web</span></code></pre>
+        </div>
+      </details>
+
+    </div>
+
+      </div>
+    </details>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     10. ABOUT LOGIN SESSIONS
+══════════════════════════════════ -->
+<section style="padding-top: 0; padding-bottom: 80px;">
+  <div class="container">
+    <div class="info-card">
+      <div class="info-card-icon">🔒</div>
+      <p>
+        <span data-lang="en"><strong style="color:var(--text-primary);">The Browser Bridge does not store any passwords.</strong> It works by connecting to your existing Chrome session — the same way you'd browse manually. BD colleagues using the web dashboard don't need to log into anything — the server machine's Chrome handles all access.</span>
+        <span data-lang="zh"><strong style="color:var(--text-primary);">Browser Bridge 不儲存任何密碼。</strong>它透過連接你現有的 Chrome session 來運作 — 跟你手動瀏覽完全一樣。BD 同事使用 web 介面時不需要登入任何網站，所有存取都由跑 server 的那台機器處理。</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     11. FOOTER
+══════════════════════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <span data-lang="en">Built with</span>
+      <span data-lang="zh">基於</span>
+      <a href="https://github.com/jackwener/opencli" target="_blank" rel="noopener">opencli</a>
+      <span class="footer-sep">|</span>
+      <span data-lang="en">Powered by</span>
+      <span data-lang="zh">AI 支援</span>
+      <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a>
+      <span class="footer-sep">|</span>
+      <a href="https://github.com/ryanhuang1109/klook-cli" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+  /* ── Language toggle ── */
+  function setLang(lang) {
+    document.body.dataset.activeLang = lang;
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+  }
+
+  /* ── Copy buttons on code blocks (skip result-block.no-copy-btn) ── */
+  function initCopyButtons() {
+    document.querySelectorAll('pre').forEach(pre => {
+      if (pre.closest('.no-copy-btn')) return;
+      const btn = document.createElement('button');
+      btn.textContent = 'Copy';
+      btn.className = 'copy-btn';
+      btn.addEventListener('click', () => {
+        const code = pre.querySelector('code').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+          btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = 'Copy', 2000);
         });
-      } catch (e) { return String(iso); }
-    }
-
-    function clearChildren(el) {
-      while (el.firstChild) el.removeChild(el.firstChild);
-    }
-
-    // ─── Initialise ───────────────────────────────────────────────────────────
-    document.getElementById('compare-date').value = today();
-
-    // ─── Load POIs ────────────────────────────────────────────────────────────
-    async function loadPois() {
-      try {
-        const res = await fetch('/api/pois');
-        if (!res.ok) throw new Error('Failed to load POIs');
-        const pois = await res.json();
-        renderPoiList(pois);
-        populatePoiDropdowns(pois);
-      } catch (err) {
-        const listEl = document.getElementById('poi-list');
-        clearChildren(listEl);
-        listEl.appendChild(makePlaceholder('Error: ' + err.message));
-      }
-    }
-
-    function renderPoiList(pois) {
-      const listEl = document.getElementById('poi-list');
-      clearChildren(listEl);
-
-      if (!pois || pois.length === 0) {
-        listEl.appendChild(makePlaceholder('No POIs yet. Add one below.'));
-        return;
-      }
-
-      pois.forEach(function(poi) {
-        const row = mk('div', 'px-5 py-3 flex items-start gap-2 hover:bg-gray-50 group');
-
-        const info = mk('div', 'flex-1 min-w-0');
-
-        const nameEl = makeText('p', 'text-sm font-semibold text-gray-900 leading-snug', poi.name);
-        append(info, nameEl);
-
-        const keywords = (poi.keywords || []).join(', ');
-        if (keywords) {
-          const kwEl = makeText('p', 'text-xs text-gray-400 mt-0.5 truncate', keywords);
-          append(info, kwEl);
-        }
-
-        if (poi.platforms && poi.platforms.length > 0) {
-          const badgesRow = mk('div', 'flex flex-wrap gap-1 mt-1');
-          poi.platforms.forEach(function(p) {
-            const badge = makeText('span', 'inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600', p);
-            append(badgesRow, badge);
-          });
-          append(info, badgesRow);
-        }
-
-        const delBtn = mk('button', 'flex-shrink-0 text-gray-300 hover:text-red-500 text-lg leading-none mt-0.5 transition-colors');
-        delBtn.textContent = '\u00D7';
-        attr(delBtn, 'type', 'button');
-        attr(delBtn, 'aria-label', 'Delete ' + (poi.name || ''));
-        delBtn.addEventListener('click', function() { deletePoi(poi.name); });
-
-        append(row, info, delBtn);
-        listEl.appendChild(row);
       });
-    }
+      pre.style.position = 'relative';
+      pre.appendChild(btn);
+    });
+  }
 
-    function populatePoiDropdowns(pois) {
-      var dropdowns = [
-        document.getElementById('compare-poi'),
-        document.getElementById('history-poi')
-      ];
-      dropdowns.forEach(function(sel) {
-        clearChildren(sel);
-        var placeholder = mk('option');
-        placeholder.value = '';
-        placeholder.textContent = '— select a POI —';
-        sel.appendChild(placeholder);
-        (pois || []).forEach(function(p) {
-          var opt = mk('option');
-          opt.value = p.name;
-          opt.textContent = p.name;
-          sel.appendChild(opt);
+  /* ── Copy buttons on user prompt bubbles ── */
+  function initPromptCopyButtons() {
+    document.querySelectorAll('.claude-example-card .user-bubble').forEach(bubble => {
+      const btn = document.createElement('button');
+      btn.textContent = 'Copy';
+      btn.className = 'prompt-copy-btn';
+      btn.addEventListener('click', () => {
+        const lang = document.body.dataset.activeLang || 'en';
+        const textEl = bubble.querySelector('.user-bubble-text [data-lang="' + lang + '"]');
+        const text = textEl ? textEl.textContent : bubble.querySelector('.user-bubble-text').textContent;
+        navigator.clipboard.writeText(text.trim()).then(() => {
+          btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = 'Copy', 2000);
         });
       });
-    }
+      bubble.appendChild(btn);
+    });
+  }
 
-    // ─── Add POI ──────────────────────────────────────────────────────────────
-    async function addPoi() {
-      var name = document.getElementById('poi-name').value.trim();
-      var keywordsRaw = document.getElementById('poi-keywords').value;
-      var keywords = keywordsRaw.split('\n').map(function(k) { return k.trim(); }).filter(Boolean);
-      var platforms = ['plat-klook','plat-trip','plat-gyg','plat-kkday']
-        .filter(function(id) { return document.getElementById(id).checked; })
-        .map(function(id) { return document.getElementById(id).value; });
+  initCopyButtons();
+  initPromptCopyButtons();
+</script>
 
-      var msgEl = document.getElementById('poi-form-msg');
-      msgEl.classList.add('hidden');
-
-      if (!name) { showFormMsg('Name is required.'); return; }
-      if (keywords.length === 0) { showFormMsg('At least one keyword is required.'); return; }
-      if (platforms.length === 0) { showFormMsg('Select at least one platform.'); return; }
-
-      var btn = document.getElementById('add-poi-btn');
-      btn.disabled = true;
-      btn.textContent = 'Adding...';
-
-      try {
-        var res = await fetch('/api/pois', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name, keywords: keywords, platforms: platforms })
-        });
-        if (!res.ok) {
-          var body = await res.json().catch(function() { return {}; });
-          throw new Error(body.error || 'Failed to add POI');
-        }
-        document.getElementById('poi-name').value = '';
-        document.getElementById('poi-keywords').value = '';
-        await loadPois();
-      } catch (err) {
-        showFormMsg(err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Add POI';
-      }
-    }
-
-    function showFormMsg(msg) {
-      var el = document.getElementById('poi-form-msg');
-      el.textContent = msg;
-      el.classList.remove('hidden');
-    }
-
-    // ─── Delete POI ───────────────────────────────────────────────────────────
-    async function deletePoi(name) {
-      if (!confirm('Delete POI "' + name + '"?')) return;
-      try {
-        var res = await fetch('/api/pois/' + encodeURIComponent(name), { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete');
-        await loadPois();
-      } catch (err) {
-        alert('Error: ' + err.message);
-      }
-    }
-
-    // ─── Run Compare ──────────────────────────────────────────────────────────
-    async function runCompare() {
-      var name = document.getElementById('compare-poi').value;
-      var date = document.getElementById('compare-date').value;
-      var errEl = document.getElementById('compare-error');
-      errEl.classList.add('hidden');
-
-      if (!name) { showCompareError('Please select a POI.'); return; }
-      if (!date) { showCompareError('Please select a date.'); return; }
-
-      var btn = document.getElementById('run-compare-btn');
-      var loadingEl = document.getElementById('compare-loading');
-
-      btn.disabled = true;
-      loadingEl.classList.remove('hidden');
-
-      try {
-        var res = await fetch('/api/compare', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name, date: date, save: true })
-        });
-        if (!res.ok) {
-          var body = await res.json().catch(function() { return {}; });
-          throw new Error(body.error || 'Compare failed');
-        }
-        var result = await res.json();
-        renderResults(result);
-      } catch (err) {
-        showCompareError(err.message);
-      } finally {
-        btn.disabled = false;
-        loadingEl.classList.add('hidden');
-      }
-    }
-
-    function showCompareError(msg) {
-      var el = document.getElementById('compare-error');
-      el.textContent = msg;
-      el.classList.remove('hidden');
-    }
-
-    // ─── Render Results ───────────────────────────────────────────────────────
-    function renderResults(result) {
-      var section = document.getElementById('results-section');
-      section.classList.remove('hidden');
-
-      var metaEl = document.getElementById('results-meta');
-      metaEl.textContent = (result.query || '') + ' \u00B7 ' + (result.date || '');
-
-      var bodyEl = document.getElementById('results-body');
-      clearChildren(bodyEl);
-
-      var groups = result.groups || [];
-      if (groups.length === 0) {
-        bodyEl.appendChild(makePlaceholder('No groups returned.'));
-      } else {
-        groups.forEach(function(g) {
-          bodyEl.appendChild(buildGroupCard(g));
-        });
-      }
-
-      var footerEl = document.getElementById('results-footer');
-      footerEl.textContent = result.currency_rates_used
-        ? 'Currency rates: ' + result.currency_rates_used
-        : '';
-
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    function buildGroupCard(group) {
-      var card = mk('div', 'px-5 py-5');
-
-      append(card,
-        makeText('p', 'text-sm font-semibold text-gray-900', group.group_name)
-      );
-
-      if (group.description) {
-        append(card,
-          makeText('p', 'text-xs text-gray-400 mt-0.5 mb-3', group.description)
-        );
-      } else {
-        append(card, mk('div', 'mb-3'));
-      }
-
-      var tableWrap = mk('div', 'overflow-x-auto rounded border border-gray-100');
-      var table = mk('table', 'w-full border-collapse text-left');
-
-      // thead
-      var thead = mk('thead');
-      var headRow = mk('tr', 'bg-gray-50 border-b border-gray-100');
-      ['Platform','Price (USD)','Original','Rating','Reviews','Notes','Link'].forEach(function(label) {
-        var th = makeText('th', 'px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide', label);
-        headRow.appendChild(th);
-      });
-      thead.appendChild(headRow);
-      table.appendChild(thead);
-
-      // tbody
-      var tbody = mk('tbody', 'divide-y divide-gray-50');
-      (group.products || []).forEach(function(p) {
-        tbody.appendChild(buildProductRow(p, group.cheapest, group.best_rated));
-      });
-      table.appendChild(tbody);
-
-      tableWrap.appendChild(table);
-      card.appendChild(tableWrap);
-      return card;
-    }
-
-    function buildProductRow(p, cheapest, bestRated) {
-      var tr = mk('tr', 'hover:bg-gray-50');
-
-      // Platform cell
-      var platformTd = mk('td', 'px-4 py-3 text-sm whitespace-nowrap');
-      var platformName = makeText('span', 'font-medium', p.platform);
-      platformTd.appendChild(platformName);
-
-      if (p.platform && p.platform === cheapest) {
-        var badge = makeText('span', 'inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 ml-1', 'cheapest');
-        platformTd.appendChild(badge);
-      }
-      if (p.platform && p.platform === bestRated) {
-        var badge2 = makeText('span', 'inline-block px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 ml-1', 'best rated');
-        platformTd.appendChild(badge2);
-      }
-
-      // Price USD cell
-      var priceTd = mk('td', 'px-4 py-3 text-sm font-mono-cell whitespace-nowrap');
-      if (p.price_usd != null) {
-        priceTd.textContent = '$' + Number(p.price_usd).toFixed(2);
-      } else {
-        var dash = makeText('span', 'text-gray-300', '\u2014');
-        priceTd.appendChild(dash);
-      }
-
-      // Original price
-      var origTd = makeText('td', 'px-4 py-3 text-sm font-mono-cell whitespace-nowrap text-gray-500', p.price_original || '\u2014');
-
-      // Rating
-      var ratingTd = makeText('td', 'px-4 py-3 text-sm whitespace-nowrap', p.rating || '\u2014');
-
-      // Reviews
-      var reviewsTd = makeText('td', 'px-4 py-3 text-sm whitespace-nowrap text-gray-500', p.review_count || '\u2014');
-
-      // Notes
-      var notesTd = makeText('td', 'px-4 py-3 text-sm text-gray-500 max-w-xs', p.notes || '');
-
-      // Link
-      var linkTd = mk('td', 'px-4 py-3 text-sm');
-      if (p.url) {
-        var link = mk('a', 'text-black underline underline-offset-2 hover:text-gray-600');
-        link.textContent = 'view';
-        link.href = p.url;
-        attr(link, 'target', '_blank');
-        attr(link, 'rel', 'noopener noreferrer');
-        linkTd.appendChild(link);
-      } else {
-        linkTd.appendChild(makeText('span', 'text-gray-300', '\u2014'));
-      }
-
-      append(tr, platformTd, priceTd, origTd, ratingTd, reviewsTd, notesTd, linkTd);
-      return tr;
-    }
-
-    // ─── History ──────────────────────────────────────────────────────────────
-    async function loadHistory() {
-      var name = document.getElementById('history-poi').value;
-      var days = document.getElementById('history-days').value;
-      var errEl = document.getElementById('history-error');
-      var bodyEl = document.getElementById('history-body');
-      errEl.classList.add('hidden');
-
-      if (!name) {
-        errEl.textContent = 'Please select a POI.';
-        errEl.classList.remove('hidden');
-        return;
-      }
-
-      clearChildren(bodyEl);
-      bodyEl.appendChild(makePlaceholder('Loading...'));
-
-      try {
-        var res = await fetch('/api/history/' + encodeURIComponent(name) + '?days=' + encodeURIComponent(days));
-        if (!res.ok) {
-          var body = await res.json().catch(function() { return {}; });
-          throw new Error(body.error || 'Failed to load history');
-        }
-        var runs = await res.json();
-        renderHistory(runs, bodyEl);
-      } catch (err) {
-        clearChildren(bodyEl);
-        errEl.textContent = err.message;
-        errEl.classList.remove('hidden');
-      }
-    }
-
-    function renderHistory(runs, bodyEl) {
-      clearChildren(bodyEl);
-
-      if (!runs || runs.length === 0) {
-        bodyEl.appendChild(makePlaceholder('No runs found for the selected period.'));
-        return;
-      }
-
-      runs.forEach(function(run) {
-        var result = run.result || {};
-        var groups = result.groups || [];
-
-        var card = mk('div', 'px-5 py-4');
-
-        var header = mk('div', 'flex items-center gap-2 mb-3');
-        append(header,
-          makeText('span', 'text-xs font-semibold text-gray-900', fmtTimestamp(run.run_at)),
-          makeText('span', 'text-xs text-gray-400 font-mono-cell', run.date || '')
-        );
-        card.appendChild(header);
-
-        if (groups.length === 0) {
-          card.appendChild(makeText('p', 'text-xs text-gray-400', 'No groups in this run.'));
-        } else {
-          groups.forEach(function(g) {
-            var groupDiv = mk('div', 'mb-2');
-            groupDiv.appendChild(makeText('p', 'text-xs font-semibold text-gray-700 mb-1', g.group_name));
-
-            var pricesRow = mk('p', 'text-xs text-gray-500 flex flex-wrap items-center gap-2');
-            (g.products || []).forEach(function(p, idx) {
-              if (idx > 0) {
-                pricesRow.appendChild(makeText('span', 'text-gray-200', '|'));
-              }
-              var wrap = mk('span', 'inline-flex items-center gap-1');
-              wrap.appendChild(makeText('span', 'font-medium text-gray-700', p.platform));
-              if (p.price_usd != null) {
-                wrap.appendChild(makeText('span', 'font-mono-cell', '$' + Number(p.price_usd).toFixed(2)));
-              } else {
-                wrap.appendChild(makeText('span', 'text-gray-300', '\u2014'));
-              }
-              pricesRow.appendChild(wrap);
-            });
-
-            groupDiv.appendChild(pricesRow);
-            card.appendChild(groupDiv);
-          });
-        }
-
-        bodyEl.appendChild(card);
-      });
-    }
-
-    // ─── Boot ─────────────────────────────────────────────────────────────────
-    loadPois();
-  </script>
 </body>
 </html>

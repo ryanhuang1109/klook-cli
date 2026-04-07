@@ -36,10 +36,12 @@ Results from all platforms are sent to AI (Claude via OpenRouter) which groups s
 
 | Platform | Search | Detail | Pricing | Date Compare |
 |----------|--------|--------|---------|-------------|
-| **Klook** | Public API (no login needed) | Itinerary + Packages + Inclusions | Yes | — |
-| **Trip.com** | Browser Bridge | Packages | Yes | Yes |
-| **GetYourGuide** | Browser Bridge | Images + Inclusions | Yes | — |
-| **KKday** | Browser Bridge | Multi-category Packages | Yes | — |
+| **Klook** | Public API (no login needed) | Packages + Itinerary + Inclusions + All Sections | Yes | — |
+| **Trip.com** | Browser Bridge | Packages + Itinerary + Inclusions + All Sections | Yes | Yes |
+| **GetYourGuide** | Browser Bridge | Packages + Itinerary + Inclusions + All Sections | Yes | — |
+| **KKday** | Browser Bridge | Packages + Itinerary + Inclusions + All Sections | Yes | — |
+
+> **Detail extraction** includes packages with pricing, itinerary steps, inclusions/exclusions, and all page sections (What to expect, How to use, Cancellation policy, etc.). Section titles are standardised to Klook naming with the platform's original title preserved.
 
 ---
 
@@ -47,6 +49,7 @@ Results from all platforms are sent to AI (Claude via OpenRouter) which groups s
 
 - **POI Monitoring** — Configure Points of Interest (e.g. "Mt Fuji day tour", "USJ tickets") with custom keywords per platform | 設定監控景點，每個平台可設定不同搜尋關鍵字
 - **Price Comparison** — AI groups similar products, normalizes to USD, highlights cheapest and best-rated | AI 自動分組、統一幣別、標出最優選擇
+- **Full Page Extraction** — Extracts packages, itinerary, inclusions/exclusions, and all page sections (What to expect, How to use, Cancellation policy, etc.) with standardised section titles across platforms | 完整擷取套餐、行程、包含/不包含項目、以及所有頁面段落，跨平台標題統一標準化
 - **Historical Tracking** — Save comparisons to local SQLite database, track price changes over days/weeks | 比價結果存入資料庫，追蹤每日價格變動
 - **Web Dashboard** — BD colleagues use the web interface — no terminal needed | BD 同事不需要 terminal，瀏覽器直接操作
 
@@ -66,7 +69,7 @@ Just open the shared URL in your browser. No installation needed.
 # Search activities
 opencli klook search "Mt Fuji day tour" --limit 5
 
-# Activity detail — itinerary, packages, pricing
+# Activity detail — packages, itinerary, inclusions, all page sections
 opencli klook detail 93901
 
 # Trip.com date comparison

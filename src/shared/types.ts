@@ -32,6 +32,15 @@ export interface KlookPackage {
   availability: string;
 }
 
+/** A named section on the activity detail page (e.g. "What to expect"). */
+export interface ActivitySection {
+  /** Standardised title using Klook naming convention. */
+  title: string;
+  /** The platform's original section title (e.g. GYG "Includes" → Klook "What's included"). */
+  original_title: string;
+  content: string;
+}
+
 /** Full activity detail including itinerary and packages. */
 export interface KlookDetail {
   title: string;
@@ -43,6 +52,7 @@ export interface KlookDetail {
   images: string[];
   itinerary: KlookItineraryStep[];
   packages: KlookPackage[];
+  sections: ActivitySection[];
   url: string;
 }
 

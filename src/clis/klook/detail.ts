@@ -1,6 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseActivityDetail } from '../../shared/parsers.js';
+import { getSectionMapJs } from '../../shared/section-map.js';
 
 export function parseActivityId(input: string): string {
   const urlMatch = input.match(/\/activity\/(\d+)/);
@@ -13,6 +14,7 @@ export function buildDetailEvaluate(): string {
   return `
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
+      ${getSectionMapJs()}
 
       // Klook is a Vue 2 app — no __NEXT_DATA__. Extract from DOM directly.
       const title = str(document.querySelector('h1')?.textContent);
@@ -145,6 +147,38 @@ export function buildDetailEvaluate(): string {
         pkg.exclusions = exclusions;
       }
 
+      // ── Sections: capture all named page sections ──
+      const sections = [];
+      const seenSections = new Set();
+
+      // 1. From klk-collapse-items (expandable sections)
+      for (const item of document.querySelectorAll('.klk-collapse-item')) {
+        const titleEl = item.querySelector('.klk-collapse-item-title');
+        const orig = str(titleEl?.textContent);
+        if (!orig || seenSections.has(orig.toLowerCase())) continue;
+        seenSections.add(orig.toLowerCase());
+        const contentEl = item.querySelector('.klk-collapse-item-content-inner') || item;
+        const content = str(contentEl?.textContent)
+          .replace(orig, '').replace(/See (more|less)/g, '').trim().slice(0, 2000);
+        if (content.length < 5) continue;
+        const m = standardizeSectionTitle(orig);
+        sections.push({ title: m.standard, original_title: m.original, content });
+      }
+
+      // 2. From h2 headings not already captured
+      for (const h2 of document.querySelectorAll('h2')) {
+        const orig = str(h2.textContent);
+        if (!orig || orig.length > 100 || seenSections.has(orig.toLowerCase())) continue;
+        if (h2.closest('.klk-collapse-item')) continue;
+        seenSections.add(orig.toLowerCase());
+        const sec = h2.closest('section, [class*="section"]') || h2.parentElement;
+        const content = str(sec?.textContent)
+          .replace(orig, '').replace(/See (more|less)/g, '').trim().slice(0, 2000);
+        if (content.length < 5) continue;
+        const m = standardizeSectionTitle(orig);
+        sections.push({ title: m.standard, original_title: m.original, content });
+      }
+
       return {
         title,
         description,
@@ -155,6 +189,7 @@ export function buildDetailEvaluate(): string {
         images,
         itinerary,
         packages,
+        sections,
         url: location.href,
       };
     })()

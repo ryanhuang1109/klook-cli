@@ -16,7 +16,7 @@ app.use('/api', createApiRouter());
 
 // SPA fallback — Express 5 requires named catch-all parameter
 app.get('{*path}', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 app.listen(PORT, () => {

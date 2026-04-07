@@ -8,6 +8,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseActivityDetail } from '../../shared/parsers.js';
+import { getSectionMapJs } from '../../shared/section-map.js';
 
 export function parseActivityId(input: string): string {
   const urlMatch = input.match(/\/detail\/(\d+)/);
@@ -20,6 +21,7 @@ export function buildDetailEvaluate(): string {
   return `
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
+      ${getSectionMapJs()}
 
       // Title: Trip.com uses div[class*=title_foot_warp_left] instead of h1
       // Fall back to document.title with Trip.com suffix stripped
@@ -60,7 +62,68 @@ export function buildDetailEvaluate(): string {
         .map((el) => str(el.textContent))
         .filter(Boolean);
 
-      // Packages from package_item_new elements
+      // ── Sections: capture all named h2/h3 sections ──
+      const sections = [];
+      const seenSections = new Set();
+      const allHeadings = Array.from(document.querySelectorAll('h2, h3'));
+
+      for (const h of allHeadings) {
+        const orig = str(h.textContent);
+        if (!orig || orig.length > 100 || seenSections.has(orig.toLowerCase())) continue;
+        seenSections.add(orig.toLowerCase());
+        const sec = h.closest('section, [class*="section"], [class*="module"]') || h.parentElement;
+        const content = str(sec?.textContent)
+          .replace(orig, '').replace(/Show (more|less)/gi, '').replace(/See (more|less)/gi, '')
+          .trim().slice(0, 2000);
+        if (content.length < 5) continue;
+        const m = standardizeSectionTitle(orig);
+        sections.push({ title: m.standard, original_title: m.original, content });
+      }
+
+      // ── Inclusions / Exclusions ──
+      let inclusions = [], exclusions = [];
+      const inclH = allHeadings.find(h => /included|includes/i.test(str(h.textContent)));
+      if (inclH) {
+        const sec = inclH.closest('section, [class*="section"], [class*="module"]') || inclH.parentElement;
+        const lists = sec?.querySelectorAll('ul') || [];
+        if (lists.length >= 2) {
+          inclusions = Array.from(lists[0].querySelectorAll('li')).map(l => str(l.textContent)).filter(Boolean);
+          exclusions = Array.from(lists[1].querySelectorAll('li')).map(l => str(l.textContent)).filter(Boolean);
+        } else if (lists.length === 1) {
+          inclusions = Array.from(lists[0].querySelectorAll('li')).map(l => str(l.textContent)).filter(Boolean);
+        }
+      }
+      // Separate exclusions heading
+      if (!exclusions.length) {
+        const exclH = allHeadings.find(h => /not included|excludes|excluded/i.test(str(h.textContent)));
+        if (exclH) {
+          const sec = exclH.closest('section, [class*="section"]') || exclH.parentElement;
+          const list = sec?.querySelector('ul');
+          if (list) exclusions = Array.from(list.querySelectorAll('li')).map(l => str(l.textContent)).filter(Boolean);
+        }
+      }
+
+      // ── Itinerary ──
+      const itinerary = [];
+      const itinH = allHeadings.find(h => /itinerary|schedule|timeline/i.test(str(h.textContent)));
+      if (itinH) {
+        const sec = itinH.closest('section, [class*="section"], [class*="module"]') || itinH.parentElement;
+        const items = sec?.querySelectorAll('[class*="step"], [class*="timeline"], [class*="item"], li') || [];
+        const seenItin = new Set();
+        for (const item of Array.from(items).slice(0, 30)) {
+          const text = str(item.textContent).slice(0, 300);
+          if (!text || seenItin.has(text)) continue;
+          seenItin.add(text);
+          const timeMatch = text.match(/(\\d{1,2}:\\d{2})/);
+          itinerary.push({
+            time: timeMatch ? timeMatch[1] : '',
+            title: text.replace(timeMatch?.[0] || '', '').trim().slice(0, 200),
+            description: '',
+          });
+        }
+      }
+
+      // ── Packages ──
       const pkgEls = document.querySelectorAll('[class*="package_item_new"]');
       const packages = Array.from(pkgEls).map((el) => {
         const text = str(el.textContent);
@@ -78,12 +141,15 @@ export function buildDetailEvaluate(): string {
         const discount = discountEl ? str(discountEl.textContent) : '';
         // Availability
         const soldOut = /sold out|unavailable/i.test(text);
+        // Package description: collect bullet points or short description near package
+        const descEl = el.querySelector('[class*="desc"], [class*="info"], [class*="detail"]');
+        const pkgDesc = descEl ? str(descEl.textContent).slice(0, 500) : '';
 
         return {
           name,
-          description: '',
-          inclusions: [],
-          exclusions: [],
+          description: pkgDesc,
+          inclusions,
+          exclusions,
           price,
           currency: price.match(/^[A-Z]+\\$?/)?.[0] || '',
           originalPrice,
@@ -101,8 +167,9 @@ export function buildDetailEvaluate(): string {
         starScore,
         reviewCount,
         images,
-        itinerary: [],
+        itinerary,
         packages,
+        sections,
         url: location.href,
       };
     })()
