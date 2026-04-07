@@ -534,6 +534,7 @@
     .user-bubble {
       padding: 16px 20px;
       border-bottom: 1px solid var(--border);
+      position: relative;
     }
 
     .user-bubble-label {
@@ -556,10 +557,30 @@
       line-height: 1.5;
     }
 
+    .user-bubble .prompt-copy-btn {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .user-bubble .prompt-copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
     .result-block {
       background: #101111;
       padding: 20px 20px;
       position: relative;
+    }
+
+    .result-block.no-copy-btn .copy-btn {
+      display: none;
     }
 
     .result-block pre {
@@ -573,7 +594,7 @@
     }
 
     .result-block pre code {
-      padding-right: 60px;
+      padding-right: 0;
     }
 
     /* ── Claude Code prompt card ── */
@@ -987,7 +1008,7 @@
             <span data-lang="zh">幫我找富士山一日遊，四個平台比價</span>
           </div>
         </div>
-        <div class="result-block">
+        <div class="result-block no-copy-btn">
           <pre><code><span class="tok-plain">Classic Mt. Fuji Day Tour (6 spots, ~10 hours)
 
 </span><span class="tok-comment">Platform     Price (USD)  Rating  Reviews</span>
@@ -1007,7 +1028,7 @@
             <span data-lang="zh">查一下 Klook 上 USJ 門票的套餐和價格</span>
           </div>
         </div>
-        <div class="result-block">
+        <div class="result-block no-copy-btn">
           <pre><code><span class="tok-plain">Universal Studios Japan Studio Pass</span>
 <span class="tok-str">★ 4.8 | 84.9K reviews</span>
 
@@ -1027,7 +1048,7 @@
             <span data-lang="zh">看一下 Trip.com 富士山 tour 未來三天的價格差異</span>
           </div>
         </div>
-        <div class="result-block">
+        <div class="result-block no-copy-btn">
           <pre><code><span class="tok-comment">Mon, Apr 7                           Tue, Apr 8</span>
 <span class="tok-plain">Standard group    $41.88  </span><span class="tok-flag">✓</span><span class="tok-plain">          $41.88  </span><span class="tok-flag">✓</span>
 <span class="tok-plain">Small group       $59.03  </span><span class="tok-flag">✓</span><span class="tok-plain">          $59.03  </span><span class="tok-flag">✓</span>
@@ -1044,7 +1065,7 @@
             <span data-lang="zh">追蹤富士山 tour 過去一週的價格變動</span>
           </div>
         </div>
-        <div class="result-block">
+        <div class="result-block no-copy-btn">
           <pre><code><span class="tok-plain">Mt Fuji day tour — price history (7 days)
 
 </span><span class="tok-plain">Classic Tour:</span>
@@ -1307,9 +1328,10 @@ Help me search and compare travel activities across Klook, Trip.com, GetYourGuid
     document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
   }
 
-  /* ── Copy buttons ── */
+  /* ── Copy buttons on code blocks (skip result-block.no-copy-btn) ── */
   function initCopyButtons() {
     document.querySelectorAll('pre').forEach(pre => {
+      if (pre.closest('.no-copy-btn')) return;
       const btn = document.createElement('button');
       btn.textContent = 'Copy';
       btn.className = 'copy-btn';
@@ -1325,7 +1347,27 @@ Help me search and compare travel activities across Klook, Trip.com, GetYourGuid
     });
   }
 
+  /* ── Copy buttons on user prompt bubbles ── */
+  function initPromptCopyButtons() {
+    document.querySelectorAll('.claude-example-card .user-bubble').forEach(bubble => {
+      const btn = document.createElement('button');
+      btn.textContent = 'Copy';
+      btn.className = 'prompt-copy-btn';
+      btn.addEventListener('click', () => {
+        const lang = document.body.dataset.activeLang || 'en';
+        const textEl = bubble.querySelector('.user-bubble-text [data-lang="' + lang + '"]');
+        const text = textEl ? textEl.textContent : bubble.querySelector('.user-bubble-text').textContent;
+        navigator.clipboard.writeText(text.trim()).then(() => {
+          btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = 'Copy', 2000);
+        });
+      });
+      bubble.appendChild(btn);
+    });
+  }
+
   initCopyButtons();
+  initPromptCopyButtons();
 </script>
 
 </body>
