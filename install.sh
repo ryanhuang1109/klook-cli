@@ -106,7 +106,18 @@ echo "Start web dashboard:"
 echo "  cd $INSTALL_DIR && npm run web"
 echo "  # → http://localhost:17890"
 echo ""
-echo "Optional — set OpenRouter API key for AI comparison:"
-echo "  mkdir -p ~/.klook-cli"
-echo "  echo '{\"openrouter_api_key\":\"YOUR-KEY\"}' > ~/.klook-cli/config.json"
+echo "--- OpenRouter API Key (for AI comparison) ---"
+echo ""
+echo "Get your key at: https://openrouter.ai/keys"
+echo ""
+read -p "Paste your OpenRouter API key (or press Enter to skip): " OPENROUTER_KEY
+if [ -n "$OPENROUTER_KEY" ]; then
+  mkdir -p ~/.klook-cli
+  echo "{\"openrouter_api_key\":\"$OPENROUTER_KEY\"}" > ~/.klook-cli/config.json
+  ok "OpenRouter API key saved to ~/.klook-cli/config.json"
+else
+  warn "Skipped. You can set it later:"
+  echo "  mkdir -p ~/.klook-cli"
+  echo "  echo '{\"openrouter_api_key\":\"YOUR-KEY\"}' > ~/.klook-cli/config.json"
+fi
 echo ""
