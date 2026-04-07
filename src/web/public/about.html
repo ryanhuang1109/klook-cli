@@ -517,6 +517,127 @@
       color: var(--border-dark);
     }
 
+    /* ── Claude Code examples ── */
+    .claude-examples {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .claude-example-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .user-bubble {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .user-bubble-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .user-bubble-text {
+      display: inline-block;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    .result-block {
+      background: #101111;
+      padding: 20px 20px;
+      position: relative;
+    }
+
+    .result-block pre {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .result-block pre code {
+      padding-right: 60px;
+    }
+
+    /* ── Claude Code prompt card ── */
+    .prompt-card {
+      background: rgba(99, 179, 255, 0.04);
+      border: 1px solid rgba(99, 179, 255, 0.15);
+      border-radius: 16px;
+      padding: 32px 36px;
+    }
+
+    .prompt-card-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent-blue);
+      margin-bottom: 12px;
+    }
+
+    .prompt-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      letter-spacing: -0.2px;
+    }
+
+    .prompt-card pre {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: 0;
+    }
+
+    /* ── Collapsible engineer setup ── */
+    .engineer-setup-toggle {
+      display: block;
+      width: 100%;
+      text-align: left;
+    }
+
+    .engineer-setup-toggle > summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 0;
+      border-bottom: none;
+    }
+
+    .engineer-setup-toggle > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .engineer-setup-toggle > summary:hover {
+      background: transparent;
+    }
+
+    .engineer-setup-toggle[open] > summary .engineer-chevron {
+      transform: rotate(90deg);
+    }
+
     /* ── Responsive ── */
     @media (max-width: 720px) {
       .grid-3 { grid-template-columns: 1fr; }
@@ -524,6 +645,7 @@
       .hero { padding: 64px 0 56px; }
       .install-card { padding: 28px 20px; }
       section { padding: 56px 0; }
+      .prompt-card { padding: 24px 20px; }
     }
 
     @media (max-width: 480px) {
@@ -820,44 +942,7 @@
 
 
 <!-- ══════════════════════════════════
-     6. CLI EXAMPLES
-══════════════════════════════════ -->
-<section style="padding-top: 0;">
-  <div class="container">
-    <div class="section-label">
-      <span data-lang="en">CLI Examples</span>
-      <span data-lang="zh">指令範例</span>
-    </div>
-    <div class="section-title">
-      <span data-lang="en">Common commands</span>
-      <span data-lang="zh">常用指令</span>
-    </div>
-
-    <div class="card" style="padding: 0; overflow: hidden;">
-      <pre><code><span class="tok-comment"># Search activities</span>
-<span class="tok-cmd">opencli</span> <span class="tok-plain">klook search</span> <span class="tok-str">"Mt Fuji day tour"</span> <span class="tok-flag">--limit</span> <span class="tok-plain">5</span>
-
-<span class="tok-comment"># Activity detail — itinerary, packages, pricing</span>
-<span class="tok-cmd">opencli</span> <span class="tok-plain">klook detail</span> <span class="tok-plain">93901</span>
-
-<span class="tok-comment"># Trip.com date comparison</span>
-<span class="tok-cmd">opencli</span> <span class="tok-plain">trip detail</span> <span class="tok-plain">92795279</span> <span class="tok-flag">--compare-dates</span>
-
-<span class="tok-comment"># AI cross-platform comparison</span>
-<span class="tok-cmd">node</span> <span class="tok-plain">dist/cli.js compare</span> <span class="tok-str">"Mt Fuji day tour"</span> <span class="tok-flag">--date</span> <span class="tok-plain">2026-04-15</span>
-
-<span class="tok-comment"># Price history tracking</span>
-<span class="tok-cmd">node</span> <span class="tok-plain">dist/cli.js compare-history</span> <span class="tok-str">"Mt Fuji day tour"</span> <span class="tok-flag">--days</span> <span class="tok-plain">7</span>
-
-<span class="tok-comment"># Start web dashboard</span>
-<span class="tok-cmd">npm</span> <span class="tok-plain">run web</span></code></pre>
-    </div>
-  </div>
-</section>
-
-
-<!-- ══════════════════════════════════
-     7. QUICK INSTALL
+     6. QUICK INSTALL
 ══════════════════════════════════ -->
 <section style="padding-top: 0;">
   <div class="container">
@@ -873,18 +958,146 @@
 
 
 <!-- ══════════════════════════════════
-     8. SETUP GUIDE
+     7. USE WITH CLAUDE CODE
 ══════════════════════════════════ -->
 <section style="padding-top: 0;">
   <div class="container">
     <div class="section-label">
-      <span data-lang="en">Setup Guide</span>
-      <span data-lang="zh">安裝說明</span>
+      <span data-lang="en">Use with Claude Code</span>
+      <span data-lang="zh">透過 Claude Code 使用</span>
     </div>
     <div class="section-title">
-      <span data-lang="en">For engineers</span>
-      <span data-lang="zh">工程師安裝流程</span>
+      <span data-lang="en">Use with Claude Code</span>
+      <span data-lang="zh">透過 Claude Code 使用</span>
     </div>
+
+    <p style="font-size:15px; color:var(--text-secondary); margin-bottom:32px; line-height:1.65;">
+      <span data-lang="en">After installation, open the project in Claude Code and ask in natural language:</span>
+      <span data-lang="zh">安裝完成後，用 Claude Code 開啟專案目錄，直接用自然語言問：</span>
+    </p>
+
+    <div class="claude-examples">
+
+      <!-- Example 1 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Find Mt Fuji day tours and compare prices across all platforms</span>
+            <span data-lang="zh">幫我找富士山一日遊，四個平台比價</span>
+          </div>
+        </div>
+        <div class="result-block">
+          <pre><code><span class="tok-plain">Classic Mt. Fuji Day Tour (6 spots, ~10 hours)
+
+</span><span class="tok-comment">Platform     Price (USD)  Rating  Reviews</span>
+<span class="tok-flag">Trip.com     $41.88       4.8     5,422    ← cheapest</span>
+<span class="tok-plain">KKday        $45.06       4.8     5,561</span>
+<span class="tok-plain">Klook        $51.45       4.8     28,200+</span><span class="tok-comment">  ← most reviewed</span>
+<span class="tok-plain">GYG          $75.00       4.7     4,980</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Example 2 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Show me USJ ticket details and package options on Klook</span>
+            <span data-lang="zh">查一下 Klook 上 USJ 門票的套餐和價格</span>
+          </div>
+        </div>
+        <div class="result-block">
+          <pre><code><span class="tok-plain">Universal Studios Japan Studio Pass</span>
+<span class="tok-str">★ 4.8 | 84.9K reviews</span>
+
+<span class="tok-comment">Package                              Price</span>
+<span class="tok-plain">1-Day Studio Pass                    US$ 55.80</span>
+<span class="tok-plain">1-Day + Nintendo World + Kansai      US$ 91.60</span>
+<span class="tok-plain">VIP Private Tour (incl. lunch)       US$ 1,554.05</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Example 3 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Compare Trip.com Mt Fuji tour prices for the next 3 days</span>
+            <span data-lang="zh">看一下 Trip.com 富士山 tour 未來三天的價格差異</span>
+          </div>
+        </div>
+        <div class="result-block">
+          <pre><code><span class="tok-comment">Mon, Apr 7                           Tue, Apr 8</span>
+<span class="tok-plain">Standard group    $41.88  </span><span class="tok-flag">✓</span><span class="tok-plain">          $41.88  </span><span class="tok-flag">✓</span>
+<span class="tok-plain">Small group       $59.03  </span><span class="tok-flag">✓</span><span class="tok-plain">          $59.03  </span><span class="tok-flag">✓</span>
+<span class="tok-plain">Alphard charter   $57.53  </span><span class="tok-str">✗ sold</span><span class="tok-plain">     $57.53  </span><span class="tok-flag">✓</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Example 4 -->
+      <div class="claude-example-card">
+        <div class="user-bubble">
+          <div class="user-bubble-label">You</div>
+          <div class="user-bubble-text">
+            <span data-lang="en">Track price changes for Mt Fuji tours over the past week</span>
+            <span data-lang="zh">追蹤富士山 tour 過去一週的價格變動</span>
+          </div>
+        </div>
+        <div class="result-block">
+          <pre><code><span class="tok-plain">Mt Fuji day tour — price history (7 days)
+
+</span><span class="tok-plain">Classic Tour:</span>
+<span class="tok-plain">  Trip.com:  $41.88 → $41.88 → </span><span class="tok-str">$43.20 (↑ $1.32)</span>
+<span class="tok-plain">  KKday:     $45.06 </span><span class="tok-comment">(no change)</span>
+<span class="tok-plain">  Klook:     $51.45 </span><span class="tok-comment">(no change)</span></code></pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     8. CLAUDE CODE PROMPT
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
+    <div class="prompt-card">
+      <div class="prompt-card-label">
+        <span data-lang="en">First-Time Setup</span>
+        <span data-lang="zh">首次使用</span>
+      </div>
+      <div class="prompt-card-title">
+        <span data-lang="en">First-Time Setup Prompt</span>
+        <span data-lang="zh">首次使用提示</span>
+      </div>
+      <p style="font-size:14px; color:var(--text-secondary); margin-bottom:20px; line-height:1.65;">
+        <span data-lang="en">Give Claude Code this prompt when opening the project for the first time:</span>
+        <span data-lang="zh">第一次用 Claude Code 開啟專案時，給它這段提示：</span>
+      </p>
+      <pre><code>Read CLAUDE.md in this project. I want to use the travel competitor monitor CLI.
+Help me search and compare travel activities across Klook, Trip.com, GetYourGuide, and KKday.</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════
+     9. SETUP GUIDE (COLLAPSED)
+══════════════════════════════════ -->
+<section style="padding-top: 0;">
+  <div class="container">
+
+    <details class="engineer-setup-toggle">
+      <summary style="cursor:pointer; color: var(--text-dim); font-size: 14px; list-style: none; display: flex; align-items: center; gap: 8px; padding: 4px 0; user-select: none; background: transparent;">
+        <span class="engineer-chevron" style="color: var(--text-muted); font-size: 11px; transition: transform 0.2s ease; display: inline-block;">▶</span>
+        <span data-lang="en">Engineer Setup Guide (8 steps)</span>
+        <span data-lang="zh">工程師安裝指南（8 步驟）</span>
+      </summary>
+
+      <div style="margin-top: 24px;">
 
     <div class="setup-steps">
 
@@ -1042,12 +1255,16 @@
       </details>
 
     </div>
+
+      </div>
+    </details>
+
   </div>
 </section>
 
 
 <!-- ══════════════════════════════════
-     9. ABOUT LOGIN SESSIONS
+     10. ABOUT LOGIN SESSIONS
 ══════════════════════════════════ -->
 <section style="padding-top: 0; padding-bottom: 80px;">
   <div class="container">
@@ -1063,7 +1280,7 @@
 
 
 <!-- ══════════════════════════════════
-     10. FOOTER
+     11. FOOTER
 ══════════════════════════════════ -->
 <footer>
   <div class="container">
