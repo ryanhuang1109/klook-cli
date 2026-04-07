@@ -1081,26 +1081,105 @@
 
 
 <!-- ══════════════════════════════════
-     8. CLAUDE CODE PROMPT
+     8. GETTING STARTED GUIDE
 ══════════════════════════════════ -->
 <section style="padding-top: 0;">
   <div class="container">
-    <div class="prompt-card">
-      <div class="prompt-card-label">
-        <span data-lang="en">First-Time Setup</span>
-        <span data-lang="zh">首次使用</span>
-      </div>
-      <div class="prompt-card-title">
-        <span data-lang="en">First-Time Setup Prompt</span>
-        <span data-lang="zh">首次使用提示</span>
-      </div>
-      <p style="font-size:14px; color:var(--text-secondary); margin-bottom:20px; line-height:1.65;">
-        <span data-lang="en">Give Claude Code this prompt when opening the project for the first time:</span>
-        <span data-lang="zh">第一次用 Claude Code 開啟專案時，給它這段提示：</span>
-      </p>
-      <pre><code>Read CLAUDE.md in this project. I want to use the travel competitor monitor CLI.
-Help me search and compare travel activities across Klook, Trip.com, GetYourGuide, and KKday.</code></pre>
+    <div class="section-label">
+      <span data-lang="en">Getting Started</span>
+      <span data-lang="zh">開始使用</span>
     </div>
+    <div class="section-title" style="margin-bottom: 32px;">
+      <span data-lang="en">After Installation</span>
+      <span data-lang="zh">安裝完成後</span>
+    </div>
+
+    <!-- Step 1: Open project in Claude Code -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">1</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Open the project in Claude Code</span>
+            <span data-lang="zh">用 Claude Code 開啟專案目錄</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Claude Code will automatically read CLAUDE.md and understand all available commands.</span>
+            <span data-lang="zh">Claude Code 會自動讀取 CLAUDE.md，了解所有可用指令。</span>
+          </p>
+          <pre style="margin: 0;"><code>cd ~/klook-cli && claude</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Set OpenRouter API key -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">2</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Set your OpenRouter API key (for AI comparison)</span>
+            <span data-lang="zh">設定 OpenRouter API key（AI 比價功能需要）</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.6;">
+            <span data-lang="en">Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a>, then run:</span>
+            <span data-lang="zh">先到 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a> 取得 key，然後執行：</span>
+          </p>
+          <pre style="margin: 0;"><code>mkdir -p ~/.klook-cli
+echo '{"openrouter_api_key":"YOUR-KEY-HERE"}' > ~/.klook-cli/config.json</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+            <span data-lang="en">Skip this step if you already set the key during installation.</span>
+            <span data-lang="zh">如果安裝時已經設定過，可以跳過這步。</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Verify Browser Bridge -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">3</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Verify Browser Bridge connection</span>
+            <span data-lang="zh">確認 Browser Bridge 已連線</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Make sure Chrome is open with the Browser Bridge extension loaded.</span>
+            <span data-lang="zh">確保 Chrome 已開啟且 Browser Bridge 擴充程式已載入。</span>
+          </p>
+          <pre style="margin: 0;"><code>opencli doctor</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+            <span data-lang="en">You should see: [OK] Daemon: running, [OK] Extension: connected, [OK] Connectivity: connected</span>
+            <span data-lang="zh">應該顯示：[OK] Daemon: running, [OK] Extension: connected, [OK] Connectivity: connected</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Start asking -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">4</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Start asking! Use natural language in Claude Code</span>
+            <span data-lang="zh">開始使用！在 Claude Code 中用自然語言提問</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Just tell it what you want. Here are some examples:</span>
+            <span data-lang="zh">直接告訴它你想查什麼，例如：</span>
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <pre style="margin: 0;"><code><span data-lang="en">Find Mt Fuji day tours and compare prices across all platforms</span><span data-lang="zh">幫我找富士山一日遊，四個平台比價</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en">Show me USJ ticket packages and prices on Klook</span><span data-lang="zh">查一下 Klook 上 USJ 門票的套餐和價格</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en">Compare Trip.com Mt Fuji tour prices for the next 3 days</span><span data-lang="zh">看一下 Trip.com 富士山 tour 未來三天的價格差異</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en">Track price changes for Mt Fuji tours over the past week</span><span data-lang="zh">追蹤富士山 tour 過去一週的價格變動</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
