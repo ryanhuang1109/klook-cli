@@ -575,8 +575,29 @@
 
     .result-block {
       background: #101111;
-      padding: 20px 20px;
+      padding: 16px 20px 20px;
       position: relative;
+    }
+
+    .result-block-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--accent-green);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .result-block-label::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
     }
 
     .result-block.no-copy-btn .copy-btn {
@@ -1009,6 +1030,7 @@
           </div>
         </div>
         <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
           <pre><code><span class="tok-plain">Classic Mt. Fuji Day Tour (6 spots, ~10 hours)
 
 </span><span class="tok-comment">Platform     Price (USD)  Rating  Reviews</span>
@@ -1029,6 +1051,7 @@
           </div>
         </div>
         <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
           <pre><code><span class="tok-plain">Universal Studios Japan Studio Pass</span>
 <span class="tok-str">★ 4.8 | 84.9K reviews</span>
 
@@ -1049,6 +1072,7 @@
           </div>
         </div>
         <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
           <pre><code><span class="tok-comment">Mon, Apr 7                           Tue, Apr 8</span>
 <span class="tok-plain">Standard group    $41.88  </span><span class="tok-flag">✓</span><span class="tok-plain">          $41.88  </span><span class="tok-flag">✓</span>
 <span class="tok-plain">Small group       $59.03  </span><span class="tok-flag">✓</span><span class="tok-plain">          $59.03  </span><span class="tok-flag">✓</span>
@@ -1066,6 +1090,7 @@
           </div>
         </div>
         <div class="result-block no-copy-btn">
+          <div class="result-block-label">Result</div>
           <pre><code><span class="tok-plain">Mt Fuji day tour — price history (7 days)
 
 </span><span class="tok-plain">Classic Tour:</span>
@@ -1094,10 +1119,32 @@
       <span data-lang="zh">安裝完成後</span>
     </div>
 
-    <!-- Step 1: Open project in Claude Code -->
+    <!-- Step 1: Install -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">1</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Install everything with one command</span>
+            <span data-lang="zh">一行指令安裝全部</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">This installs opencli, klook-cli, builds the Browser Bridge extension, and registers all plugins. It will also ask for your OpenRouter API key.</span>
+            <span data-lang="zh">自動安裝 opencli、klook-cli、建構 Browser Bridge 擴充程式、註冊所有平台。最後會詢問你的 OpenRouter API key。</span>
+          </p>
+          <pre style="margin: 0;"><code>curl -fsSL https://raw.githubusercontent.com/ryanhuang1109/klook-cli/main/install.sh | bash</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+            <span data-lang="en">After install, load the Browser Bridge extension in Chrome: chrome://extensions/ → Developer Mode → Load unpacked → select /tmp/opencli-extension/extension</span>
+            <span data-lang="zh">安裝完成後，在 Chrome 載入擴充程式：chrome://extensions/ → 開發者模式 → 載入未封裝項目 → 選擇 /tmp/opencli-extension/extension</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Open project in Claude Code -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">2</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
             <span data-lang="en">Open the project in Claude Code</span>
@@ -1112,10 +1159,10 @@
       </div>
     </div>
 
-    <!-- Step 2: Set OpenRouter API key -->
+    <!-- Step 3: Set OpenRouter API key -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
-        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">2</div>
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">3</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
             <span data-lang="en">Set your OpenRouter API key (for AI comparison)</span>
@@ -1135,10 +1182,10 @@ echo '{"openrouter_api_key":"YOUR-KEY-HERE"}' > ~/.klook-cli/config.json</code><
       </div>
     </div>
 
-    <!-- Step 3: Verify Browser Bridge -->
+    <!-- Step 4: Verify Browser Bridge -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
-        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">3</div>
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">4</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
             <span data-lang="en">Verify Browser Bridge connection</span>
@@ -1157,10 +1204,10 @@ echo '{"openrouter_api_key":"YOUR-KEY-HERE"}' > ~/.klook-cli/config.json</code><
       </div>
     </div>
 
-    <!-- Step 4: Start asking -->
+    <!-- Step 5: Start asking -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
-        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">4</div>
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">5</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
             <span data-lang="en">Start asking! Use natural language in Claude Code</span>
