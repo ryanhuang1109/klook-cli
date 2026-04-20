@@ -88,29 +88,18 @@ echo "=========================================="
 echo -e "${GREEN}  Installation complete!${NC}"
 echo "=========================================="
 echo ""
-echo "One manual step remaining — load the Chrome extension:"
-echo ""
-echo "  1. Open Chrome"
-echo "  2. Go to chrome://extensions/"
-echo "  3. Enable 'Developer Mode' (top right)"
-echo "  4. Click 'Load unpacked'"
-echo "  5. Select: $EXTENSION_DIR/extension"
-echo ""
-echo "Then verify:"
-echo "  opencli doctor"
-echo ""
-echo "Quick test:"
-echo "  opencli klook search \"Tokyo Disneyland\" --limit 3"
-echo ""
-echo "Start web dashboard:"
-echo "  cd $INSTALL_DIR && npm run web"
-echo "  # → http://localhost:17890"
-echo ""
 echo "--- OpenRouter API Key (for AI comparison) ---"
 echo ""
 echo "Get your key at: https://openrouter.ai/keys"
 echo ""
-read -p "Paste your OpenRouter API key (or press Enter to skip): " OPENROUTER_KEY
+
+if [ -r /dev/tty ]; then
+  read -p "Paste your OpenRouter API key (or press Enter to skip): " OPENROUTER_KEY < /dev/tty
+else
+  OPENROUTER_KEY=""
+  warn "No TTY available — skipping interactive key prompt."
+fi
+
 if [ -n "$OPENROUTER_KEY" ]; then
   mkdir -p ~/.klook-cli
   echo "{\"openrouter_api_key\":\"$OPENROUTER_KEY\"}" > ~/.klook-cli/config.json
@@ -120,4 +109,46 @@ else
   echo "  mkdir -p ~/.klook-cli"
   echo "  echo '{\"openrouter_api_key\":\"YOUR-KEY\"}' > ~/.klook-cli/config.json"
 fi
+
+echo ""
+echo "=========================================="
+echo -e "${YELLOW}  NEXT: Load the Chrome extension${NC}"
+echo "=========================================="
+echo ""
+echo "Chrome blocks auto-loading unpacked extensions for security,"
+echo "so this one step must be done manually (~30 seconds):"
+echo ""
+echo "  1. Chrome will open to chrome://extensions/"
+echo "  2. Toggle 'Developer mode' (top-right)"
+echo "  3. Click 'Load unpacked'"
+echo "  4. A Finder window will open at the extension folder — just click 'Select'"
+echo ""
+echo "Extension folder: $EXTENSION_DIR/extension"
+echo ""
+
+# Best-effort: open Chrome at the extensions page and reveal the folder in Finder
+if [ "$(uname)" = "Darwin" ]; then
+  if [ -d "/Applications/Google Chrome.app" ]; then
+    open -a "Google Chrome" "chrome://extensions/" 2>/dev/null || true
+  elif [ -d "/Applications/Chromium.app" ]; then
+    open -a "Chromium" "chrome://extensions/" 2>/dev/null || true
+  fi
+  open "$EXTENSION_DIR/extension" 2>/dev/null || true
+  ok "Opened Chrome extensions page + Finder window for you"
+fi
+
+echo ""
+echo "After loading the extension, verify with:"
+echo "  opencli doctor"
+echo ""
+echo "Then log into these sites in Chrome (Klook not needed):"
+echo "  - https://www.trip.com"
+echo "  - https://www.getyourguide.com"
+echo "  - https://www.kkday.com"
+echo ""
+echo "Quick test:"
+echo "  opencli klook search \"Tokyo Disneyland\" --limit 3"
+echo ""
+echo "Web dashboard:"
+echo "  cd $INSTALL_DIR && npm run web    # → http://localhost:17890"
 echo ""
