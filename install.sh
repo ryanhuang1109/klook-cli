@@ -93,10 +93,13 @@ echo ""
 echo "Get your key at: https://openrouter.ai/keys"
 echo ""
 
-if [ -r /dev/tty ]; then
-  read -p "Paste your OpenRouter API key (or press Enter to skip): " OPENROUTER_KEY < /dev/tty
+OPENROUTER_KEY=""
+# Try to actually open /dev/tty (not just check permissions — on macOS
+# /dev/tty is always crw-rw-rw- but opening fails without a controlling
+# terminal, e.g. in CI or a detached shell).
+if (exec </dev/tty) 2>/dev/null; then
+  read -p "Paste your OpenRouter API key (or press Enter to skip): " OPENROUTER_KEY < /dev/tty || OPENROUTER_KEY=""
 else
-  OPENROUTER_KEY=""
   warn "No TTY available — skipping interactive key prompt."
 fi
 
