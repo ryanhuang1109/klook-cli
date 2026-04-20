@@ -90,3 +90,49 @@ When users ask you to monitor or track prices:
 1. **Add a POI** with relevant keywords
 2. **Run compare** with `--save` to store the baseline
 3. Explain they can run `compare` again later (or via cron) to track changes
+
+## Extending the Tool
+
+### Adding a new platform (e.g. Viator, Expedia, Airbnb Experiences)
+
+Each platform lives in `src/clis/<name>/` as a standalone opencli plugin with the same three commands: `search`, `detail`, `trending`. The build compiles to `dist/clis/<name>/` which is symlinked into `~/.opencli/plugins/<name>/`.
+
+Steps to add a new platform — you can do these yourself without asking the user to touch anything:
+
+1. **Copy an existing adapter as template.** Klook is a public-API adapter (`Strategy.PUBLIC`, no browser). Trip/GYG/KKday are Browser Bridge adapters that scrape DOM (`Strategy.BROWSER_BRIDGE`). Pick whichever matches the new site:
+   ```bash
+   cp -r src/clis/klook src/clis/viator        # if target has a public API
+   cp -r src/clis/kkday src/clis/viator        # if you need to scrape DOM
+   ```
+
+2. **Rewrite `search.ts` and `detail.ts`** — the shape they must return is defined in `src/shared/types.ts` and `src/shared/parsers.ts`. Minimum for search: `{ id, title, price, rating, review_count, url }`. Minimum for detail: `{ packages, itinerary, sections }`. Keep the `cli({ site, name, ... })` registration block — just change `site` and `domain`.
+
+3. **Build and register.**
+   ```bash
+   npm run build
+   ln -sf "$PWD/dist/clis/viator" ~/.opencli/plugins/viator
+   echo '{"name":"viator","version":"0.1.0","opencli":">=1.0.0"}' > dist/clis/viator/opencli-plugin.json
+   opencli viator search "test" --limit 3     # smoke test
+   ```
+
+4. **Enable for AI comparison (no code change needed).** `src/compare/compare.ts` iterates whatever platforms the POI has configured — it doesn't have a hardcoded list. Just include the new platform when creating the POI:
+   ```bash
+   node dist/cli.js poi add "Mt Fuji" --keywords "Mt Fuji tour" --platforms klook,trip,viator
+   ```
+
+5. **(Optional) Web dashboard** — no work needed for the new platform to show up. The dashboard reads from the same POI config.
+
+### Modifying an existing platform
+
+Just edit `src/clis/<platform>/*.ts` and `npm run build`. Symlinks mean no re-registration. Verify with `opencli <platform> detail <id> -f json`.
+
+### When the user asks Claude Code to extend
+
+If the user asks "add platform X" or "the Klook detail is missing Y", you have everything you need:
+
+- Source code of 4 working adapters to copy from
+- `opencli doctor` to verify Browser Bridge is live
+- `opencli <platform> search "..."` to test your changes
+- `curl` and browser dev tools (via Browser Bridge) to reverse-engineer target sites
+
+Iterate in the terminal: write adapter → build → run → read JSON output → fix → repeat. Expect the first draft of a new adapter to take 3–5 iterations against the real site.
