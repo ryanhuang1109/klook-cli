@@ -120,32 +120,53 @@ export async function ingestBySearch(
     opts.onProgress?.(
       `${opts.platform}/${activityId} (${parseReviewCount(hit.review_count).toLocaleString()} reviews) — ${hit.title.slice(0, 60)}`,
     );
-    try {
-      await ingestFromDetail(db, {
-        platform: opts.platform,
-        activityId,
-        poi: opts.poi,
-        canonicalUrl: url,
-        captureScreenshot: opts.captureScreenshot,
-        sessionId: opts.sessionId,
-      });
-      succeeded++;
-    } catch (err) {
-      const msg = (err as Error).message.slice(0, 200);
-      failed.push({ url, reason: msg });
-      // Log the failed attempt so it's visible in the session record
-      db.logExecution({
-        session_id: opts.sessionId ?? null,
-        platform: opts.platform,
-        activity_id: activityId,
-        strategy: 'opencli-detail',
-        duration_ms: 0,
-        succeeded: 0,
-        error_message: msg,
-        packages_written: 0,
-        skus_written: 0,
-        fallback_reason: null,
-      });
+
+    // Transient browser-bridge failures — mostly seen on Trip.com where the
+    // detail page re-renders mid-scrape — surface as "navigated or closed"
+    // / "Target closed" / "Session closed". Retry once with a 4s delay to
+    // let the bridge settle. Anything else fails immediately.
+    const TRANSIENT_RE = /navigated or closed|target closed|session closed|ERR_NETWORK|Execution context was destroyed/i;
+    const maxAttempts = 2;
+    let lastErr: string | null = null;
+    let done = false;
+
+    for (let attempt = 1; attempt <= maxAttempts && !done; attempt++) {
+      try {
+        await ingestFromDetail(db, {
+          platform: opts.platform,
+          activityId,
+          poi: opts.poi,
+          canonicalUrl: url,
+          captureScreenshot: opts.captureScreenshot,
+          sessionId: opts.sessionId,
+        });
+        succeeded++;
+        done = true;
+      } catch (err) {
+        lastErr = (err as Error).message.slice(0, 200);
+        if (attempt < maxAttempts && TRANSIENT_RE.test(lastErr)) {
+          opts.onProgress?.(
+            `  ↻ transient error on ${opts.platform}/${activityId}, retrying in 4s…`,
+          );
+          await new Promise((r) => setTimeout(r, 4000));
+          continue;
+        }
+        // Either non-transient or out of retries
+        failed.push({ url, reason: lastErr });
+        db.logExecution({
+          session_id: opts.sessionId ?? null,
+          platform: opts.platform,
+          activity_id: activityId,
+          strategy: 'opencli-detail',
+          duration_ms: 0,
+          succeeded: 0,
+          error_message: lastErr,
+          packages_written: 0,
+          skus_written: 0,
+          fallback_reason: null,
+        });
+        done = true;
+      }
     }
   }
 

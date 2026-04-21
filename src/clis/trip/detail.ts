@@ -287,8 +287,13 @@ cli({
     }
 
     await page.goto(targetUrl);
-    await page.wait(5000);
+    // Trip.com is a heavy React app that lazy-loads the SKU section on
+    // scroll. Give the page a beat to hydrate before scrolling, then wait
+    // again after scroll — skipping either causes intermittent "target
+    // navigated or closed" errors during the subsequent DOM reads.
+    await page.wait(6000);
     await page.autoScroll({ times: 3, delayMs: 1500 });
+    await page.wait(2000);
 
     // If compare-dates flag is set, collect pricing across all visible dates
     if (kwargs['compare-dates']) {
@@ -304,17 +309,17 @@ cli({
       };
     }
 
-    // Walk every dropdown / tab cluster in the SKU/package area — Trip.com
-    // surfaces package variants as tabs (`.m_ceil`) and sometimes as pickers
-    // (language, passenger tier). Capture these as option dimensions so the
-    // normalizer can fan out to multiple package rows.
+    // Read Trip.com's SKU-tab cluster PASSIVELY — just grab the text labels,
+    // no clicks. Earlier we had a generic dropdown walker here that clicked
+    // every `[class*="selector"]` element; on Trip that matched the date
+    // cells (also `.m_ceil`), and each click fired an AJAX price refresh
+    // that frequently broke the browser-bridge session with
+    // `Inspected target navigated or closed`. Passive read is enough — the
+    // SKU tabs already give us the main package-variant axis.
     const dimensions = await page.evaluate(`
-      (async () => {
+      (() => {
         const str = (v) => v == null ? '' : String(v).trim().replace(/\\s+/g, ' ');
-        const delay = (ms) => new Promise(r => setTimeout(r, ms));
         const dims = [];
-
-        // 1) SKU tab cluster = main package dimension
         const skuContainer = document.querySelector('[class*="sku_tab_ceil"]');
         if (skuContainer) {
           const tabs = Array.from(skuContainer.querySelectorAll('[class*="m_ceil"][id]'))
@@ -325,33 +330,6 @@ cli({
           if (opts.length >= 1) {
             dims.push({ label: 'Package', selected: opts[0] ?? '', options: opts });
           }
-        }
-
-        // 2) Any additional dropdowns in the booking sidebar
-        const booking = document.querySelector('[class*="buy-box"], [class*="sku-content"], [class*="detail_right"]') || document.body;
-        const triggers = Array.from(booking.querySelectorAll('[aria-haspopup], [aria-expanded], [class*="dropdown"], [class*="selector"]'))
-          .filter((el) => {
-            const t = str(el.textContent);
-            return t && t.length > 0 && t.length < 80;
-          });
-        const seen = new Set();
-        for (const trigger of triggers.slice(0, 5)) {
-          const label = str(trigger.textContent);
-          if (seen.has(label)) continue;
-          seen.add(label);
-          try {
-            trigger.click();
-            await delay(500);
-            const optEls = Array.from(document.querySelectorAll(
-              '[role="option"], [role="radio"], [role="menuitem"], [class*="dropdown"] li, [class*="menu"] li'
-            ));
-            const opts = Array.from(new Set(
-              optEls.map((el) => str(el.textContent)).filter((t) => t && t.length < 120)
-            ));
-            if (opts.length >= 2) dims.push({ label, selected: label, options: opts.slice(0, 20) });
-            document.body.click();
-            await delay(250);
-          } catch (e) {}
         }
         return { dimensions: dims };
       })()
