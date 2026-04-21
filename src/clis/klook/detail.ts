@@ -24,14 +24,75 @@ export function buildDetailEvaluate(): string {
         document.querySelector('meta[name="description"]')?.getAttribute('content')
       );
 
-      // Rating + reviews: scan all <span> for patterns
-      let starScore = '', reviewCount = '';
+      // Rating + reviews + bookings: scan all <span> for patterns.
+      // Klook header shows e.g. "4.8/5  29.2K reviews  200K+ booked"
+      let starScore = '', reviewCount = '', bookCount = '';
       const spans = Array.from(document.querySelectorAll('span'));
       for (const s of spans) {
         const t = str(s.textContent);
         if (!starScore && /^\\d\\.\\d$/.test(t)) { starScore = t; }
-        if (!reviewCount && /\\d.*reviews?/i.test(t)) { reviewCount = t; }
+        if (!reviewCount && /[\\d.,]+[KM]?\\s*reviews?/i.test(t) && t.length < 40) { reviewCount = t; }
+        if (!bookCount && /[\\d.,]+[KM]?\\+?\\s*booked/i.test(t) && t.length < 40) { bookCount = t; }
       }
+
+      // Language list: Klook renders a joined string like "English/Chinese/Hindi/Japanese/Korean"
+      let languagesHeader = '';
+      for (const s of spans) {
+        const t = str(s.textContent);
+        if (!languagesHeader && /^[A-Z][a-z]+(?:\\/[A-Z][a-z]+){1,6}$/.test(t) && t.length < 120) {
+          languagesHeader = t;
+          break;
+        }
+      }
+
+      // Tour type + meeting point tags (e.g., "Join in group", "Private tour", "Meet at location", "Hotel pickup")
+      let tourTypeTag = '', meetingTag = '';
+      for (const s of spans) {
+        const t = str(s.textContent);
+        if (!tourTypeTag && /^(join in group|private tour|shared group|small group)$/i.test(t)) tourTypeTag = t;
+        if (!meetingTag && /^(meet at location|hotel pickup|hotel transfer|pickup included)$/i.test(t)) meetingTag = t;
+      }
+
+      // Supplier: Klook renders an explicit "Supplier <name>" line. Be strict —
+      // require the candidate to look like a company name (ends in 株式会社, Ltd,
+      // LLC, Inc, Co., Tours, Travel, Group) otherwise we'd catch prose like
+      // "Provider will notify you...". Match within a sensible window.
+      let supplier = '';
+      const bodyText = document.body.innerText;
+      const supplierRegex =
+        /(?:Supplier|Operated by|Provided by)\\s*[:\\-]?\\s*([^\\n]{2,120}?(?:株式会社|有限会社|合同会社|有限公司|株式會社|Ltd\\.?|LLC|Inc\\.?|Co\\.?,?\\s*Ltd\\.?|Corporation|Tours|Travel|Group|GmbH|SA|SAS|Pty\\.?|Pvt\\.?))/i;
+      const suppMatch = bodyText.match(supplierRegex);
+      if (suppMatch) {
+        supplier = suppMatch[1].trim().replace(/^[:\\s\\-]+/, '').slice(0, 120);
+      }
+
+      // Badges: Klook renders header "chips" like Klook's choice, Cherry Blossom
+      // Guarantee, 2026 Best Things to Do. They live inside the title block —
+      // look near the <h1> for <a>/<div> chips with short text.
+      const h1 = document.querySelector('h1');
+      let badgeSources = [];
+      if (h1) {
+        // Walk up to the title container and scan its descendants
+        let container = h1.parentElement;
+        for (let i = 0; i < 3 && container; i++) container = container.parentElement;
+        if (container) {
+          badgeSources = Array.from(container.querySelectorAll('a, div, span'))
+            .map((el) => str(el.textContent))
+            .filter((t) => t && t.length > 3 && t.length < 60);
+        }
+      }
+      const badgeMatchers = [
+        /klook'?s?\\s*choice/i,
+        /best\\s*(?:things|of|sellers?)/i,
+        /guarantee/i,
+        /best[-\\s]*seller/i,
+        /top[-\\s]*rated/i,
+        /recommended/i,
+        /new/i,
+      ];
+      const badges = Array.from(new Set(
+        badgeSources.filter((t) => badgeMatchers.some((re) => re.test(t)))
+      )).slice(0, 6);
 
       // Images: activity images from Klook CDN
       const seen = new Set();
@@ -186,6 +247,12 @@ export function buildDetailEvaluate(): string {
         categoryName,
         starScore,
         reviewCount,
+        bookCount,
+        badges,
+        languagesHeader,
+        tourTypeTag,
+        meetingTag,
+        supplier,
         images,
         itinerary,
         packages,

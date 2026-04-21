@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tours Pipeline · klook-cli</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+         margin: 0; padding: 28px 32px; background: #fafafa; color: #111; }
+  h1 { margin: 0 0 6px; font-size: 22px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 28px; }
+  .card { background: white; border: 1px solid #e5e5e5; border-radius: 10px;
+          padding: 22px; margin-bottom: 20px; }
+  label { display: block; font-size: 12px; color: #444; text-transform: uppercase;
+          letter-spacing: 0.04em; margin-bottom: 6px; margin-top: 14px; font-weight: 600; }
+  input[type=text], input[type=number] { width: 100%; padding: 10px 12px;
+     border: 1px solid #d1d5db; border-radius: 7px; font-size: 14px; }
+  .competitors { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+  .competitors label { text-transform: none; letter-spacing: normal;
+     display: inline-flex; align-items: center; gap: 6px; margin: 0;
+     padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 999px;
+     cursor: pointer; font-size: 13px; font-weight: 500; }
+  .competitors label.on { background: #111; color: white; border-color: #111; }
+  .competitors input[type=checkbox] { display: none; }
+  .row { display: flex; gap: 18px; }
+  .row > div { flex: 1; }
+  button.primary { background: #111; color: white; padding: 12px 22px;
+     border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+     cursor: pointer; margin-top: 20px; }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .toggle { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: #333; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #f3f4f6; text-align: left; padding: 8px 10px; font-weight: 600;
+       color: #444; border-bottom: 1px solid #e5e5e5; font-size: 11px;
+       text-transform: uppercase; letter-spacing: 0.03em; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
+  tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .small { color: #888; font-size: 11px; }
+  .mono { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
+          font-size: 11px; font-weight: 500; }
+  .pill.running { background: #dbeafe; color: #1e40af; }
+  .pill.done { background: #dcfce7; color: #166534; }
+  .pill.failed { background: #fee2e2; color: #991b1b; }
+  .status-msg { color: #666; font-size: 13px; margin-top: 12px; }
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <h1>Tours Pipeline</h1>
+  <div class="sub">Trigger a cross-platform competitor scan. Results land in
+    <code>data/reports/latest.html</code> and the DB.</div>
+
+  <div class="card">
+    <form id="run-form">
+      <div class="row">
+        <div>
+          <label>Destination</label>
+          <input type="text" name="destination" placeholder="tokyo, bangkok, paris …" required>
+        </div>
+        <div>
+          <label>Keyword / subvertical</label>
+          <input type="text" name="keyword" placeholder="mt fuji, temple, river cruise …">
+        </div>
+      </div>
+
+      <label style="margin-top:20px">Competitors</label>
+      <div class="competitors" id="competitors">
+        <label><input type="checkbox" value="klook" checked>Klook</label>
+        <label><input type="checkbox" value="trip" checked>Trip.com</label>
+        <label><input type="checkbox" value="getyourguide" checked>GetYourGuide</label>
+        <label><input type="checkbox" value="kkday" checked>KKday</label>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Limit per platform</label>
+          <input type="number" name="limit" value="10" min="1" max="100">
+        </div>
+        <div>
+          <label>POI label (optional)</label>
+          <input type="text" name="poi" placeholder="(defaults to keyword)">
+        </div>
+      </div>
+
+      <label class="toggle" style="margin-top:18px">
+        <input type="checkbox" name="screenshot" checked>
+        Capture page screenshots (slower, but proves we saw the page)
+      </label>
+
+      <div>
+        <button type="submit" class="primary" id="submit-btn">Start run</button>
+        <span class="status-msg" id="status-msg"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0; font-size:15px">Recent sessions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Started</th><th>Destination</th><th>Keyword</th><th>POI</th>
+          <th>Competitors</th><th>Status</th><th>Session</th>
+        </tr>
+      </thead>
+      <tbody id="sessions-body">
+        <tr><td colspan="7" class="small">Loading…</td></tr>
+      </tbody>
+    </table>
+    <p class="small" style="margin-top:14px">
+      <a href="/api/tours/latest-report" target="_blank">View latest HTML report →</a>
+    </p>
+  </div>
+
+<script>
+// Chip toggle behaviour
+for (const label of document.querySelectorAll('#competitors label')) {
+  const cb = label.querySelector('input');
+  if (cb.checked) label.classList.add('on');
+  cb.addEventListener('change', () => {
+    label.classList.toggle('on', cb.checked);
+  });
+}
+
+function cell(text, className) {
+  const td = document.createElement('td');
+  td.textContent = text == null ? '' : String(text);
+  if (className) td.className = className;
+  return td;
+}
+
+async function refreshSessions() {
+  const body = document.getElementById('sessions-body');
+  try {
+    const res = await fetch('/api/tours/sessions?limit=15');
+    const sessions = await res.json();
+    body.textContent = '';
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      const row = document.createElement('tr');
+      const td = cell('(no sessions yet)', 'small');
+      td.colSpan = 7;
+      row.appendChild(td);
+      body.appendChild(row);
+      return;
+    }
+    for (const s of sessions) {
+      const row = document.createElement('tr');
+      const started = (s.started_at || '').replace('T', ' ').slice(0, 19);
+      let comps = s.competitors || '';
+      try { comps = JSON.parse(s.competitors).join(', '); } catch (_e) {}
+      row.appendChild(cell(started, 'mono'));
+      row.appendChild(cell(s.destination));
+      row.appendChild(cell(s.keyword || '—'));
+      row.appendChild(cell(s.poi));
+      row.appendChild(cell(comps, 'small'));
+      const statusTd = document.createElement('td');
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + (s.status || '');
+      pill.textContent = s.status || '';
+      statusTd.appendChild(pill);
+      row.appendChild(statusTd);
+      row.appendChild(cell(s.id, 'mono small'));
+      body.appendChild(row);
+    }
+  } catch (err) {
+    body.textContent = '';
+    const row = document.createElement('tr');
+    const td = cell('Failed to load sessions.', 'small');
+    td.colSpan = 7;
+    row.appendChild(td);
+    body.appendChild(row);
+  }
+}
+
+document.getElementById('run-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const competitors = Array.from(
+    document.querySelectorAll('#competitors input:checked')
+  ).map(cb => cb.value);
+  const payload = {
+    destination: form.destination.value.trim(),
+    keyword: form.keyword.value.trim(),
+    competitors,
+    limit: parseInt(form.limit.value, 10) || 10,
+    poi: form.poi.value.trim() || undefined,
+    screenshot: form.screenshot.checked,
+  };
+  const btn = document.getElementById('submit-btn');
+  const msg = document.getElementById('status-msg');
+  btn.disabled = true;
+  msg.textContent = 'Starting…';
+  try {
+    const res = await fetch('/api/tours/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    msg.textContent = '';
+    const link = document.createElement('a');
+    link.href = '/api/tours/latest-report';
+    link.target = '_blank';
+    link.textContent = 'view report when ready';
+    msg.appendChild(document.createTextNode('Started · '));
+    msg.appendChild(link);
+    setTimeout(refreshSessions, 1500);
+  } catch (err) {
+    msg.textContent = 'Error: ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+refreshSessions();
+setInterval(refreshSessions, 5000);
+</script>
+</body>
+</html>

@@ -1,4 +1,9 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/web/public"
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist/web/public",
+  "cleanUrls": true,
+  "redirects": [
+    { "source": "/report", "destination": "/reports/latest.html", "permanent": false },
+    { "source": "/csv", "destination": "/exports/latest.csv", "permanent": false }
+  ]
 }

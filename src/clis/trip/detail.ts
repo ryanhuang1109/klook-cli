@@ -42,12 +42,24 @@ export function buildDetailEvaluate(): string {
       );
 
       // Rating + reviews: scan page text for patterns like "4.8/5" and "(419 reviews)"
-      let starScore = '', reviewCount = '';
+      let starScore = '', reviewCount = '', bookCount = '';
       const bodyText = document.body.innerText;
       const ratingMatch = bodyText.match(/(\\d\\.\\d)\\/5/);
       if (ratingMatch) starScore = ratingMatch[1];
-      const reviewMatch = bodyText.match(/\\(?(\\d[\\d,]*\\s*reviews?)\\)?/i);
+      const reviewMatch = bodyText.match(/\\(?(\\d[\\d,]*[KM]?\\s*reviews?)\\)?/i);
       if (reviewMatch) reviewCount = reviewMatch[1];
+      // Trip.com surfaces bookings as e.g. "10K+ booked" or "1,234 orders"
+      const bookMatch = bodyText.match(/([\\d,.]+[KM]?\\+?\\s*(?:booked|orders|sold))/i);
+      if (bookMatch) bookCount = bookMatch[1];
+
+      // Supplier — require a company-name suffix to avoid catching prose text
+      let supplier = '';
+      const supplierRegex =
+        /(?:Operated by|Supplier|Provided by)\\s*[:\\-]?\\s*([^\\n]{2,120}?(?:株式会社|有限会社|合同会社|有限公司|株式會社|Ltd\\.?|LLC|Inc\\.?|Co\\.?,?\\s*Ltd\\.?|Corporation|Tours|Travel|Group|GmbH|SA|SAS|Pty\\.?|Pvt\\.?))/i;
+      const supMatch = bodyText.match(supplierRegex);
+      if (supMatch) {
+        supplier = supMatch[1].trim().replace(/^[:\\s\\-]+/, '').slice(0, 120);
+      }
 
       // Images from CDN
       const seenImgs = new Set();
@@ -166,6 +178,8 @@ export function buildDetailEvaluate(): string {
         categoryName: '',
         starScore,
         reviewCount,
+        bookCount,
+        supplier,
         images,
         itinerary,
         packages,
@@ -290,10 +304,67 @@ cli({
       };
     }
 
+    // Walk every dropdown / tab cluster in the SKU/package area — Trip.com
+    // surfaces package variants as tabs (`.m_ceil`) and sometimes as pickers
+    // (language, passenger tier). Capture these as option dimensions so the
+    // normalizer can fan out to multiple package rows.
+    const dimensions = await page.evaluate(`
+      (async () => {
+        const str = (v) => v == null ? '' : String(v).trim().replace(/\\s+/g, ' ');
+        const delay = (ms) => new Promise(r => setTimeout(r, ms));
+        const dims = [];
+
+        // 1) SKU tab cluster = main package dimension
+        const skuContainer = document.querySelector('[class*="sku_tab_ceil"]');
+        if (skuContainer) {
+          const tabs = Array.from(skuContainer.querySelectorAll('[class*="m_ceil"][id]'))
+            .filter((el) => /^\\d+$/.test(el.id));
+          const opts = Array.from(new Set(
+            tabs.map((el) => str(el.textContent).slice(0, 120))
+          )).filter(Boolean);
+          if (opts.length >= 1) {
+            dims.push({ label: 'Package', selected: opts[0] ?? '', options: opts });
+          }
+        }
+
+        // 2) Any additional dropdowns in the booking sidebar
+        const booking = document.querySelector('[class*="buy-box"], [class*="sku-content"], [class*="detail_right"]') || document.body;
+        const triggers = Array.from(booking.querySelectorAll('[aria-haspopup], [aria-expanded], [class*="dropdown"], [class*="selector"]'))
+          .filter((el) => {
+            const t = str(el.textContent);
+            return t && t.length > 0 && t.length < 80;
+          });
+        const seen = new Set();
+        for (const trigger of triggers.slice(0, 5)) {
+          const label = str(trigger.textContent);
+          if (seen.has(label)) continue;
+          seen.add(label);
+          try {
+            trigger.click();
+            await delay(500);
+            const optEls = Array.from(document.querySelectorAll(
+              '[role="option"], [role="radio"], [role="menuitem"], [class*="dropdown"] li, [class*="menu"] li'
+            ));
+            const opts = Array.from(new Set(
+              optEls.map((el) => str(el.textContent)).filter((t) => t && t.length < 120)
+            ));
+            if (opts.length >= 2) dims.push({ label, selected: label, options: opts.slice(0, 20) });
+            document.body.click();
+            await delay(250);
+          } catch (e) {}
+        }
+        return { dimensions: dims };
+      })()
+    `) as any;
+
     // Standard detail extraction
-    const raw = await page.evaluate(buildDetailEvaluate());
+    const raw = await page.evaluate(buildDetailEvaluate()) as any;
     if (!raw || !raw.title) {
       throw new Error('Could not extract activity detail from Trip.com.');
+    }
+
+    if (dimensions && Array.isArray(dimensions.dimensions)) {
+      raw.option_dimensions = dimensions.dimensions;
     }
 
     return parseActivityDetail(raw);

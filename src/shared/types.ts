@@ -54,6 +54,25 @@ export interface KlookDetail {
   packages: KlookPackage[];
   sections: ActivitySection[];
   url: string;
+  /** "200K+ booked" etc. — kept as raw string; normalizer parses to int. */
+  order_count?: string;
+  /** Klook-style badges like "Klook's choice", "Cherry Blossom Guarantee". */
+  badges?: string[];
+  /** Header languages like "English/Chinese/Hindi/Japanese/Korean". */
+  languages_header?: string;
+  /** Tour type tag shown in header ("Join in group", "Private tour"). */
+  tour_type_tag?: string;
+  /** Meeting-type tag ("Meet at location", "Hotel pickup"). */
+  meeting_tag?: string;
+  /** Supplier / operator name if parseable from page text. */
+  supplier?: string;
+  /**
+   * Package-variant axes scraped from booking-widget dropdowns/tabs.
+   * Each dimension is one choice the user has to make: language, passenger
+   * tier, vehicle, guide type etc. The full set of packages = cartesian
+   * product of these dimensions, though we don't always fan out that way.
+   */
+  option_dimensions?: { label: string; selected: string; options: string[] }[];
 }
 
 /** A POI (Point of Interest) to monitor across platforms. */

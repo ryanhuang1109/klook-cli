@@ -91,6 +91,98 @@ When users ask you to monitor or track prices:
 2. **Run compare** with `--save` to store the baseline
 3. Explain they can run `compare` again later (or via cron) to track changes
 
+## Tours Pipeline (scheduled routine workflow)
+
+The tours module turns raw scraper output into a canonical three-tier schema
+(Activity → Package → SKU) stored in `data/tours.db`, then exports to the
+planning CSV format and an HTML report. This is the pipeline a scheduled
+routine should drive.
+
+### Canonical schema
+
+- **Activity** — one per (platform, product_id). Identified by `canonical_url`.
+- **Package** — variant within an activity (language bundle, group size, meals).
+- **SKU** — `(package × travel_date)`. Price lives here. Daily observations are
+  appended to `sku_observations` so history never overwrites.
+
+### Core commands
+
+```bash
+# Ingest one activity (runs opencli <platform> pricing under the hood)
+node dist/cli.js tours ingest <platform> <activity-id> --poi "<POI>" --days 7
+
+# Bulk: read all (platform, activity-id) pairs from the planning CSV
+node dist/cli.js tours ingest-from-golden data/golden/pricing-tna-planning.csv \
+  --platforms klook,trip --days 7
+
+# Ingest from a previously saved JSON snapshot (skips scraping — useful when blocked)
+node dist/cli.js tours ingest-snapshot klook data/snapshots/<file>.json \
+  --poi "Mount Fuji" --url <canonical-url>
+
+# Export DB to CSV matching the planning sheet
+node dist/cli.js tours export
+
+# Generate HTML coverage/completeness report (writes latest.html)
+node dist/cli.js tours report
+
+# List activities currently in the DB
+node dist/cli.js tours list --platform klook --poi "Mount Fuji"
+
+# Mark data as reviewed (feedback mechanism)
+node dist/cli.js tours review-sku <sku-id> verified --note "checked on live site"
+node dist/cli.js tours review-activity <activity-id> rejected --note "wrong POI"
+
+# Cross-platform match from a URL (URL-first lookup, LLM-ranked)
+node dist/cli.js tours match-from-url "https://www.klook.com/en-US/activity/151477" \
+  --to trip -f json
+```
+
+### Routine workflow (what a scheduled Claude Code run should do)
+
+1. **Fetch fresh pricing.** For each (platform, activity-id) target:
+   - `node dist/cli.js tours ingest <platform> <id> --poi "<POI>" --days 7`
+   - If it fails (block, timeout, empty result), retry once. Still failing:
+     use the `browse` skill or agent-browser to capture the page manually,
+     save the SKU rows as JSON matching `PricingRunRaw`, then run
+     `tours ingest-snapshot` instead.
+2. **Export and report.**
+   - `node dist/cli.js tours export` → `data/exports/<today>.csv`
+   - `node dist/cli.js tours report` → `data/reports/<today>.html` + `latest.html`
+3. **Check completeness.** Open the generated JSON summary. If any of
+   `completeness_flags.missing_supplier`, `missing_departure_time`,
+   `unknown_tour_type` is unexpectedly high, investigate and re-ingest the
+   offending activities with agent-browser to fill gaps.
+4. **Flag anomalies.** If an SKU's price moved >30% from the previous
+   observation, auto-flag it: `tours review-sku <id> flagged --note "price jump"`.
+5. **Read prior feedback.** Before re-scraping, query `activities` where
+   `review_status = 'rejected'` and skip them. Where `review_status = 'flagged'`
+   and `review_note` suggests a fix (e.g. "use en-UK locale"), honor the note.
+
+### Feedback loop
+
+Human feedback enters via the `tours review-sku` / `tours review-activity`
+commands. Review statuses: `unverified` (default), `verified`, `flagged`,
+`rejected`. Routines consult these before the next run so mistakes aren't
+repeated. A weekly export of flagged rows should be used to tune the
+normalizer heuristics in `src/tours/normalize.ts`.
+
+### Verification
+
+- **Golden CSV** (`data/golden/pricing-tna-planning.csv`) is the reference
+  truth for (platform, activity_id) coverage and expected POIs.
+- **Schema validation**: the normalizer enforces canonical types via Zod.
+- **Completeness report**: every `tours report` run surfaces which fields are
+  missing per platform — this is the first thing to inspect after a run.
+- **Snapshot retention**: every real ingest writes `data/snapshots/<platform>-<id>-<timestamp>.json`
+  so failures can be replayed without re-scraping.
+
+### Storage
+
+- Default: SQLite at `data/tours.db` (local).
+- Planned: Supabase migration post-demo. Schema in `src/tours/db.ts` is
+  Postgres-compatible except for the `AUTOINCREMENT` detail on
+  `sku_observations.id` which becomes `GENERATED ALWAYS AS IDENTITY`.
+
 ## Extending the Tool
 
 ### Adding a new platform (e.g. Viator, Expedia, Airbnb Experiences)

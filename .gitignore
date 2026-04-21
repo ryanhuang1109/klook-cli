@@ -4,3 +4,14 @@ dist/
 .opencli/
 .vercel
 .env*.local
+.DS_Store
+**/.DS_Store
+
+# Tours pipeline runtime artifacts — regenerable + large
+data/tours.db
+data/tours.db-journal
+data/screenshots/
+data/snapshots/
+# Exports are per-day timestamped; keep the dir (with .gitkeep) but not files
+data/exports/*.csv
+!data/exports/.gitkeep

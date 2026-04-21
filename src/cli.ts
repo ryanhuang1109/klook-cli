@@ -204,6 +204,247 @@ program
     }
   });
 
+// ── Tours commands ────────────────────────────────────────────────
+const toursCmd = program
+  .command('tours')
+  .description('Tours pipeline: ingest pricing, export to CSV, generate HTML report, cross-platform match');
+
+toursCmd
+  .command('ingest <platform> <activity-id>')
+  .description('Run opencli pricing for one activity and store in tours DB')
+  .option('--poi <poi>', 'POI label (e.g. "Mount Fuji")')
+  .option('--days <n>', 'Days of pricing to fetch', '7')
+  .option('--url <url>', 'Canonical URL override')
+  .action(async (platform: string, activityId: string, opts: any) => {
+    const { cmdIngest } = await import('./tours/commands.js');
+    try {
+      await cmdIngest({
+        platform,
+        activityId,
+        poi: opts.poi,
+        days: parseInt(opts.days) || 7,
+        url: opts.url,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('ingest-detail <platform> <activity-id>')
+  .description('Fallback ingest using opencli <platform> detail (works when pricing scraper fails)')
+  .option('--poi <poi>', 'POI label')
+  .option('--url <url>', 'Canonical URL override')
+  .option('--travel-date <d>', 'Travel date label for the stored SKUs (default: tomorrow)')
+  .option('--screenshot', 'Also capture a page screenshot to data/screenshots/', false)
+  .option('--agent-mode <mode>', 'Agent fallback mode when opencli returns 0 packages: none | oneshot | loop', 'oneshot')
+  .action(async (platform: string, activityId: string, opts: any) => {
+    const { cmdIngestDetail } = await import('./tours/commands.js');
+    try {
+      await cmdIngestDetail({
+        platform,
+        activityId,
+        poi: opts.poi,
+        url: opts.url,
+        travelDate: opts.travelDate,
+        screenshot: !!opts.screenshot,
+        agentMode: opts.agentMode === 'loop' ? 'loop' : opts.agentMode === 'none' ? 'none' : 'oneshot',
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('run')
+  .description('End-to-end: iterate each competitor, ingest-search, then export CSV + HTML report')
+  .requiredOption('--destination <d>', 'Destination (e.g. "bangkok", "tokyo")')
+  .option('--keyword <k>', 'Subvertical / theme keyword (e.g. "temple", "river cruise")', '')
+  .requiredOption('--competitors <list>', 'Comma-separated platforms: klook,trip,getyourguide,kkday')
+  .option('--poi <poi>', 'POI label (defaults to keyword or destination)')
+  .option('--limit <n>', 'Top N per platform after ranking (default 30)', '30')
+  .option('--sort <key>', 'reviews | recommended', 'reviews')
+  .option('--screenshot', 'Capture a screenshot per activity', false)
+  .action(async (opts: any) => {
+    const { cmdRun } = await import('./tours/commands.js');
+    try {
+      await cmdRun({
+        destination: opts.destination,
+        keyword: opts.keyword,
+        competitors: opts.competitors.split(',').map((s: string) => s.trim()),
+        poi: opts.poi,
+        limit: parseInt(opts.limit) || 30,
+        sortBy: opts.sort === 'recommended' ? 'recommended' : 'reviews',
+        screenshot: !!opts.screenshot,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('ingest-search <platform> <keyword>')
+  .description('Search opencli for keyword, rank by review count, ingest top N via detail fallback')
+  .requiredOption('--poi <poi>', 'POI label to assign to discovered activities')
+  .option('--limit <n>', 'Top N results to ingest after ranking (default 30)', '30')
+  .option('--sort <key>', 'Sort before ingest: reviews (default) or recommended', 'reviews')
+  .option('--screenshot', 'Capture a screenshot per activity', false)
+  .action(async (platform: string, keyword: string, opts: any) => {
+    const { cmdIngestSearch } = await import('./tours/commands.js');
+    try {
+      await cmdIngestSearch({
+        platform,
+        keyword,
+        poi: opts.poi,
+        limit: parseInt(opts.limit) || 30,
+        sortBy: opts.sort === 'recommended' ? 'recommended' : 'reviews',
+        screenshot: !!opts.screenshot,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('ingest-snapshot <platform> <file>')
+  .description('Ingest a previously saved pricing JSON snapshot (skips scraping)')
+  .option('--poi <poi>', 'POI label')
+  .option('--url <url>', 'Canonical URL override')
+  .action(async (platform: string, file: string, opts: any) => {
+    const { cmdIngestSnapshot } = await import('./tours/commands.js');
+    try {
+      await cmdIngestSnapshot({ platform, file, poi: opts.poi, url: opts.url });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('ingest-from-golden <csv>')
+  .description('Read the planning CSV, ingest all unique (platform, activity_id) targets')
+  .option('--platforms <list>', 'Comma-separated platforms to include')
+  .option('--days <n>', 'Days of pricing to fetch', '7')
+  .option('--limit <n>', 'Only process first N targets')
+  .option('--dry-run', 'Print targets without scraping', false)
+  .action(async (csv: string, opts: any) => {
+    const { cmdIngestFromGolden } = await import('./tours/commands.js');
+    try {
+      await cmdIngestFromGolden({
+        csv,
+        platforms: opts.platforms ? opts.platforms.split(',').map((s: string) => s.trim()) : undefined,
+        days: parseInt(opts.days) || 7,
+        limit: opts.limit ? parseInt(opts.limit) : undefined,
+        dryRun: !!opts.dryRun,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('export')
+  .description('Export the tours DB to a CSV matching the planning sheet format')
+  .option('--out <path>', 'Output CSV path (default: data/exports/<today>.csv)')
+  .option('--pois <list>', 'Comma-separated POIs to include')
+  .option('--platforms <list>', 'Comma-separated platforms to include')
+  .option('--date <date>', 'Only include SKUs for this travel date (YYYY-MM-DD)')
+  .action(async (opts: any) => {
+    const { cmdExport } = await import('./tours/commands.js');
+    try {
+      await cmdExport({
+        out: opts.out,
+        pois: opts.pois ? opts.pois.split(',').map((s: string) => s.trim()) : undefined,
+        platforms: opts.platforms ? opts.platforms.split(',').map((s: string) => s.trim()) : undefined,
+        date: opts.date,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('report')
+  .description('Generate HTML summary report (coverage, completeness, recent rows)')
+  .option('--out <path>', 'Output HTML path')
+  .action(async (opts: any) => {
+    const { cmdReport } = await import('./tours/commands.js');
+    try {
+      await cmdReport({ out: opts.out });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('list')
+  .description('List all activities currently in the tours DB')
+  .option('--platform <p>', 'Filter by platform')
+  .option('--poi <poi>', 'Filter by POI')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .action(async (opts: any) => {
+    const { cmdListActivities } = await import('./tours/commands.js');
+    await cmdListActivities({ platform: opts.platform, poi: opts.poi, format: opts.format });
+  });
+
+toursCmd
+  .command('review-sku <sku-id> <status>')
+  .description('Mark an SKU as verified | flagged | rejected | unverified')
+  .option('--note <note>', 'Reason / note for the review')
+  .action(async (skuId: string, status: string, opts: any) => {
+    const { cmdReviewSKU } = await import('./tours/commands.js');
+    try {
+      await cmdReviewSKU({ sku_id: skuId, status, note: opts.note });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('review-activity <id> <status>')
+  .description('Mark an activity as verified | flagged | rejected | unverified')
+  .option('--note <note>', 'Reason / note for the review')
+  .action(async (id: string, status: string, opts: any) => {
+    const { cmdReviewActivity } = await import('./tours/commands.js');
+    try {
+      await cmdReviewActivity({ id, status, note: opts.note });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('match-from-url <url>')
+  .description('Given a URL on one platform, find similar tours on another (LLM-ranked)')
+  .requiredOption('--to <platform>', 'Target platform (trip, kkday, getyourguide, klook)')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .option('--model <m>', 'OpenRouter model slug (default: openai/gpt-4o-mini)')
+  .option('--limit <n>', 'Max candidates to fetch per search phrase', '8')
+  .action(async (url: string, opts: any) => {
+    const { cmdMatchFromUrl } = await import('./tours/commands.js');
+    try {
+      await cmdMatchFromUrl({
+        url,
+        to: opts.to,
+        format: opts.format,
+        model: opts.model,
+        limit: parseInt(opts.limit) || 8,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 // ── Compare history command ───────────────────────────────────────
 program
   .command('compare-history <name>')

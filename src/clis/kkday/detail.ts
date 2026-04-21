@@ -27,12 +27,30 @@ export function buildDetailEvaluate(): string {
         document.querySelector('meta[name="description"]')?.getAttribute('content')
       );
 
-      // Rating + reviews
+      // Rating + reviews + bookings
       const bodyText = document.body.innerText;
       const ratingMatch = bodyText.match(/(\\d\\.\\d)\\s*(?:\\(|\\/)/) || bodyText.match(/(\\d\\.\\d)/);
       const starScore = ratingMatch ? ratingMatch[1] : '';
       const reviewMatch = bodyText.match(/([\\d,]+[KkMm]?)\\+?\\s*reviews?/i);
       const reviewCount = reviewMatch ? reviewMatch[0] : '';
+
+      // KKday shows bookings as "X+ booked" / "X travelers booked" / "Sold X+"
+      let bookCount = '';
+      const bookMatch =
+        bodyText.match(/([\\d,.]+[KkMm]?\\+?)\\s+travel(?:ers|lers)\\s+booked/i) ||
+        bodyText.match(/([\\d,.]+[KkMm]?\\+?)\\s+booked/i) ||
+        bodyText.match(/Sold\\s+([\\d,.]+[KkMm]?\\+?)/i);
+      if (bookMatch) bookCount = bookMatch[1];
+
+      // Supplier — KKday labels the operator as "Supplier", "Operated by",
+      // or 供應商. Require a company-name suffix to avoid noise.
+      let supplier = '';
+      const supRegex =
+        /(?:Supplier|Operated by|Provided by|供應商|供应商)\\s*[:\\-]?\\s*([^\\n]{2,120}?(?:株式会社|有限会社|合同会社|有限公司|Ltd\\.?|LLC|Inc\\.?|Co\\.?,?\\s*Ltd\\.?|Corporation|Tours|Travel|Group|GmbH|SA|SAS|Pty\\.?|Pvt\\.?|旅行社|旅遊))/i;
+      const supMatch = bodyText.match(supRegex);
+      if (supMatch) {
+        supplier = supMatch[1].trim().replace(/^[:\\s\\-]+/, '').slice(0, 120);
+      }
 
       // Images
       const seenImgs = new Set();
@@ -105,11 +123,33 @@ export function buildDetailEvaluate(): string {
       }
 
       // ── Packages ──
+      // h3 headings that look package-ish. Skip help/instructional sections
+      // (how-to, voucher redemption, terms) and anything beyond the
+      // "you might also like" / "related products" boundary — those are
+      // carousel entries for DIFFERENT products, not packages of this tour.
+      const INSTRUCTION_RE = /^(how to|when to|why|before |after |please |note |important |terms |faq |voucher (?:redemption|period|use|refund|policy))/i;
+
+      // Relevance filter: require the package h3 to share at least one
+      // distinctive word with the activity title. Related-product carousels
+      // (TeamLab, SHIBUYA SKY etc.) share prices + "Ticket"/"Tour" labels
+      // with real variants but don't share POI keywords.
+      const COMMON = new Set(['tour','day','trip','ticket','pass','private','experience','tokyo','japan','from','with','the','and','guaranteed','departure','option','including']);
+      const titleKeywords = new Set(
+        (title.toLowerCase().match(/[a-z\\u4e00-\\u9fff]{3,}/g) || [])
+          .filter((w) => !COMMON.has(w))
+      );
+
       const h3s = Array.from(document.querySelectorAll('h3'));
       const packages = [];
       for (const h3 of h3s) {
+        // Require relevance to the activity title
+        const h3Lower = str(h3.textContent).toLowerCase();
+        const hasRelevance = titleKeywords.size === 0 ||
+          Array.from(titleKeywords).some((kw) => h3Lower.includes(kw));
+        if (!hasRelevance) continue;
         let name = str(h3.textContent);
         if (!name || name.length < 5 || name.length > 200) continue;
+        if (INSTRUCTION_RE.test(name)) continue;
         if (!/pass|ticket|tour|bundle|voucher|nintendo|vip|admission|experience/i.test(name)) continue;
         // Clean "Use instantly" suffix
         name = name.replace(/Use instantly$/i, '').trim();
@@ -125,6 +165,10 @@ export function buildDetailEvaluate(): string {
             price = match ? match[1] : '';
           }
         }
+
+        // Skip entries without a price — those are almost always instruction
+        // blocks, booking-policy sections, or related-products teasers.
+        if (!price) continue;
 
         // Check availability
         const parentText = str(parent?.textContent || '');
@@ -156,6 +200,8 @@ export function buildDetailEvaluate(): string {
         categoryName: '',
         starScore,
         reviewCount,
+        bookCount,
+        supplier,
         images,
         itinerary,
         packages,
@@ -191,9 +237,56 @@ cli({
     await page.wait(5000);
     await page.autoScroll({ times: 3, delayMs: 1500 });
 
-    const raw = await page.evaluate(buildDetailEvaluate());
+    // Walk dropdowns in the booking widget — KKday exposes time-slot,
+    // language, and package-tier pickers the same way GYG/Trip do.
+    const dimensions = await page.evaluate(`
+      (async () => {
+        const str = (v) => v == null ? '' : String(v).trim().replace(/\\s+/g, ' ');
+        const delay = (ms) => new Promise(r => setTimeout(r, ms));
+        const BLOCK = /^(most recent|highest rated|sort|filter|see all|show more|read more|share|save|close|help|login|sign in)$/i;
+
+        // Anchor on the booking container if present, else the whole body.
+        const booking =
+          document.querySelector('[class*="booking"], [class*="buy-box"], [class*="product-option"], [class*="sku"]') ||
+          document.body;
+
+        const triggers = Array.from(booking.querySelectorAll(
+          '[aria-haspopup], [aria-expanded], button[class*="select"], button[class*="dropdown"], button[class*="picker"]'
+        )).filter((el) => {
+          const t = str(el.textContent);
+          return t && t.length > 0 && t.length < 80 && !BLOCK.test(t);
+        });
+
+        const seen = new Set();
+        const dims = [];
+        for (const trigger of triggers.slice(0, 6)) {
+          const label = str(trigger.textContent);
+          if (seen.has(label)) continue;
+          seen.add(label);
+          try {
+            trigger.click();
+            await delay(500);
+            const optEls = Array.from(document.querySelectorAll(
+              '[role="option"], [role="radio"], [role="menuitem"]'
+            ));
+            const opts = Array.from(new Set(
+              optEls.map((el) => str(el.textContent)).filter((t) => t && t.length < 120 && !BLOCK.test(t))
+            ));
+            if (opts.length >= 2) dims.push({ label, selected: label, options: opts.slice(0, 20) });
+            document.body.click();
+            await delay(250);
+          } catch (e) {}
+        }
+        return { dimensions: dims };
+      })()
+    `) as any;
+
+    const raw = await page.evaluate(buildDetailEvaluate()) as any;
     if (!raw || !raw.title) {
       throw new Error('Could not extract product detail from KKday.');
+    }
+    if (dimensions && Array.isArray(dimensions.dimensions)) {
+      raw.option_dimensions = dimensions.dimensions;
     }
     return parseActivityDetail(raw);
   },

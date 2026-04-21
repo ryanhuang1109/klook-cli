@@ -97,5 +97,14 @@ export function parseActivityDetail(raw: unknown): KlookDetail {
     packages,
     sections,
     url: str(r.url),
-  };
+    // Extra header-scoped fields (optional — downstream normalize layer consumes them):
+    order_count: str(r.bookCount),
+    badges: Array.isArray(r.badges) ? (r.badges as unknown[]).map(str).filter(Boolean) : [],
+    languages_header: str(r.languagesHeader),
+    tour_type_tag: str(r.tourTypeTag),
+    meeting_tag: str(r.meetingTag),
+    supplier: str(r.supplier),
+    // Dropdowns / tabs in the booking widget that represent package-variant axes
+    option_dimensions: Array.isArray(r.option_dimensions) ? r.option_dimensions : [],
+  } as KlookDetail;
 }
