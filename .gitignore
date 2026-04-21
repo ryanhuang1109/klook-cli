@@ -17,3 +17,7 @@ data/snapshots/
 data/exports/*.csv
 !data/exports/.gitkeep
 !data/exports/latest.csv
+
+# Cron routine logs — noisy, not worth tracking
+data/routine-logs/*.log
+!data/routine-logs/.gitkeep
