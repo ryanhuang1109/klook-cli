@@ -12,6 +12,8 @@ data/tours.db
 data/tours.db-journal
 data/screenshots/
 data/snapshots/
-# Exports are per-day timestamped; keep the dir (with .gitkeep) but not files
+# Exports are per-day timestamped; keep the dir (with .gitkeep) but not files.
+# Exception: track `latest.csv` so Vercel's static build has something to serve.
 data/exports/*.csv
 !data/exports/.gitkeep
+!data/exports/latest.csv

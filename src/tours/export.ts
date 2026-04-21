@@ -179,6 +179,12 @@ export function exportToSheetCSV(
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, lines.join('\n'));
+
+  // Also write a stable `latest.csv` alongside the dated file. Vercel's static
+  // build picks this up and serves it at /csv so BD links stay valid.
+  const latestPath = path.join(path.dirname(outPath), 'latest.csv');
+  fs.writeFileSync(latestPath, lines.join('\n'));
+
   return { rowsWritten, path: outPath };
 }
 
