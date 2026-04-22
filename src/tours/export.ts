@@ -510,6 +510,15 @@ export function renderHTMLReport(
     .crosstab tfoot td { border-top: 1px solid #d1d5db; background: #fafafa; }
     .crosstab tbody tr:hover { background: #fafafa; }
 
+    /* Summary tab: the small stats tables (Per-platform, Per-POI, POI × Platform)
+       read as numeric matrices, not list rows — center the headers and numbers
+       so the digit column lines up directly under its label. First column
+       (the dimension label) stays left-aligned. */
+    .tab-panel[data-panel="summary"] table th { text-align: center; }
+    .tab-panel[data-panel="summary"] table th:first-child { text-align: left; }
+    .tab-panel[data-panel="summary"] table td.num { text-align: center; }
+    .tab-panel[data-panel="summary"] table tfoot td.num { text-align: center; }
+
     .filters { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0 10px; }
     .filters label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #333; font-weight: 500; }
     .filters select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; background: white; min-width: 140px; }
