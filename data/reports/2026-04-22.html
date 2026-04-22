@@ -33,6 +33,10 @@
     a:hover { text-decoration: underline; }
     .download { display: inline-block; background: #111; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; margin-right: 8px; }
     .download:hover { background: #333; text-decoration: none; }
+    /* Cross-tab: footer row gets a top border + slight emphasis to read as totals. */
+    .crosstab tfoot td { border-top: 1px solid #d1d5db; background: #fafafa; }
+    .crosstab tbody tr:hover { background: #fafafa; }
+
     .filters { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0 10px; }
     .filters label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #333; font-weight: 500; }
     .filters select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; background: white; min-width: 140px; }
@@ -61,7 +65,7 @@
 </head>
 <body>
   <h1>Tours Pricing Report</h1>
-  <div class="sub">Generated at 2026-04-22T02:31:20.670Z</div>
+  <div class="sub">Generated at 2026-04-22T02:41:24.172Z</div>
 
   <div>
     <a class="download" href="/csv" download="tours-latest.csv">Download CSV</a>
@@ -797,7 +801,36 @@
   <h2>Per-platform</h2>
   <table>
     <thead><tr><th>Platform</th><th>Activities</th><th>SKUs</th></tr></thead>
-    <tbody><tr><td>KKday</td><td>30</td><td>197</td></tr><tr><td>Klook</td><td>29</td><td>194</td></tr><tr><td>Trip.com</td><td>7</td><td>47</td></tr><tr><td>GetYourGuide</td><td>28</td><td>28</td></tr></tbody>
+    <tbody><tr><td>KKday</td><td class="num">30</td><td class="num">197</td></tr><tr><td>Klook</td><td class="num">29</td><td class="num">194</td></tr><tr><td>Trip.com</td><td class="num">7</td><td class="num">47</td></tr><tr><td>GetYourGuide</td><td class="num">28</td><td class="num">28</td></tr></tbody>
+  </table>
+
+  <h2>Per-POI</h2>
+  <table>
+    <thead><tr><th>POI</th><th>Activities</th><th>SKUs</th></tr></thead>
+    <tbody><tr><td>Mount Fuji Retry</td><td class="num">1</td><td class="num">12</td></tr><tr><td>dmz</td><td class="num">29</td><td class="num">137</td></tr><tr><td>kiyomizu temple</td><td class="num">29</td><td class="num">124</td></tr><tr><td>mt fuji</td><td class="num">35</td><td class="num">193</td></tr></tbody>
+  </table>
+
+  <h2>POI × Platform <span class="small" style="font-weight:400;color:#888">(activities / SKUs)</span></h2>
+  <table class="crosstab">
+    <thead><tr><th>POI</th><th>GetYourGuide</th><th>KKday</th><th>Klook</th><th>Trip.com</th><th>Total</th></tr></thead>
+    <tbody><tr>
+        <td>Mount Fuji Retry</td>
+        <td class="num small">—</td><td class="num small">—</td><td class="num small">—</td><td class="num" title="1 activity · 12 SKUs"><strong>1</strong> <span class="small">/ 12</span></td>
+        <td class="num"><strong>1</strong> <span class="small">/ 12</span></td>
+      </tr><tr>
+        <td>dmz</td>
+        <td class="num" title="10 activities · 10 SKUs"><strong>10</strong> <span class="small">/ 10</span></td><td class="num" title="10 activities · 93 SKUs"><strong>10</strong> <span class="small">/ 93</span></td><td class="num" title="9 activities · 34 SKUs"><strong>9</strong> <span class="small">/ 34</span></td><td class="num small">—</td>
+        <td class="num"><strong>29</strong> <span class="small">/ 137</span></td>
+      </tr><tr>
+        <td>kiyomizu temple</td>
+        <td class="num" title="9 activities · 9 SKUs"><strong>9</strong> <span class="small">/ 9</span></td><td class="num" title="10 activities · 46 SKUs"><strong>10</strong> <span class="small">/ 46</span></td><td class="num" title="10 activities · 69 SKUs"><strong>10</strong> <span class="small">/ 69</span></td><td class="num small">—</td>
+        <td class="num"><strong>29</strong> <span class="small">/ 124</span></td>
+      </tr><tr>
+        <td>mt fuji</td>
+        <td class="num" title="9 activities · 9 SKUs"><strong>9</strong> <span class="small">/ 9</span></td><td class="num" title="10 activities · 58 SKUs"><strong>10</strong> <span class="small">/ 58</span></td><td class="num" title="10 activities · 91 SKUs"><strong>10</strong> <span class="small">/ 91</span></td><td class="num" title="6 activities · 35 SKUs"><strong>6</strong> <span class="small">/ 35</span></td>
+        <td class="num"><strong>35</strong> <span class="small">/ 193</span></td>
+      </tr></tbody>
+    <tfoot><tr><td><strong>Total</strong></td><td class="num"><strong>28</strong> <span class="small">/ 28</span></td><td class="num"><strong>30</strong> <span class="small">/ 197</span></td><td class="num"><strong>29</strong> <span class="small">/ 194</span></td><td class="num"><strong>7</strong> <span class="small">/ 47</span></td><td class="num"><strong>94</strong> <span class="small">/ 466</span></td></tr></tfoot>
   </table>
 
   <h2>Completeness gaps</h2>
@@ -5470,7 +5503,7 @@
   </table>
   </section>
 
-  <div class="footer">Built with klook-cli tours pipeline · opencli primitives + canonical schema · 2026-04-22T02:31:20.670Z</div>
+  <div class="footer">Built with klook-cli tours pipeline · opencli primitives + canonical schema · 2026-04-22T02:41:24.172Z</div>
 
 <script>
 // ── Tabs ──────────────────────────────────────────────────────────

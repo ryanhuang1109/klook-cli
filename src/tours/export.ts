@@ -369,9 +369,85 @@ export function renderHTMLReport(
   const platformRows = summary.platforms
     .map(
       (p) =>
-        `<tr><td>${PLATFORM_LABELS[p.platform] ?? p.platform}</td><td>${p.activities}</td><td>${p.skus}</td></tr>`,
+        `<tr><td>${PLATFORM_LABELS[p.platform] ?? p.platform}</td><td class="num">${p.activities}</td><td class="num">${p.skus}</td></tr>`,
     )
     .join('');
+
+  // ── Per-POI aggregate + POI × Platform cross-tab ─────────────────
+  // Aggregate the activity summary we already have. No extra DB round trip.
+  type Cell = { activities: number; skus: number };
+  const byPoi = new Map<string, Cell>();
+  const cross = new Map<string, Map<string, Cell>>();
+  const platformTotals = new Map<string, Cell>();
+
+  for (const a of activities) {
+    const poiKey = a.poi ?? '(no POI)';
+
+    const poiCell = byPoi.get(poiKey) ?? { activities: 0, skus: 0 };
+    poiCell.activities += 1;
+    poiCell.skus += a.sku_count;
+    byPoi.set(poiKey, poiCell);
+
+    if (!cross.has(poiKey)) cross.set(poiKey, new Map());
+    const row = cross.get(poiKey)!;
+    const cell = row.get(a.platform) ?? { activities: 0, skus: 0 };
+    cell.activities += 1;
+    cell.skus += a.sku_count;
+    row.set(a.platform, cell);
+
+    const tot = platformTotals.get(a.platform) ?? { activities: 0, skus: 0 };
+    tot.activities += 1;
+    tot.skus += a.sku_count;
+    platformTotals.set(a.platform, tot);
+  }
+
+  const poiOrder = Array.from(byPoi.keys()).sort();
+  const platformOrder = Array.from(platformTotals.keys()).sort();
+
+  const perPoiRows = poiOrder
+    .map((poi) => {
+      const c = byPoi.get(poi)!;
+      return `<tr><td>${escapeHtml(poi)}</td><td class="num">${c.activities}</td><td class="num">${c.skus}</td></tr>`;
+    })
+    .join('');
+
+  // Cross-tab: each cell shows "activities / skus". Empty cells show —.
+  const crossHeader =
+    `<th>POI</th>` +
+    platformOrder
+      .map((p) => `<th>${escapeHtml(PLATFORM_LABELS[p] ?? p)}</th>`)
+      .join('') +
+    `<th>Total</th>`;
+
+  const crossBody = poiOrder
+    .map((poi) => {
+      const row = cross.get(poi)!;
+      const total = byPoi.get(poi)!;
+      const cells = platformOrder
+        .map((p) => {
+          const c = row.get(p);
+          return c
+            ? `<td class="num" title="${c.activities} activit${c.activities === 1 ? 'y' : 'ies'} · ${c.skus} SKU${c.skus === 1 ? '' : 's'}"><strong>${c.activities}</strong> <span class="small">/ ${c.skus}</span></td>`
+            : `<td class="num small">—</td>`;
+        })
+        .join('');
+      return `<tr>
+        <td>${escapeHtml(poi)}</td>
+        ${cells}
+        <td class="num"><strong>${total.activities}</strong> <span class="small">/ ${total.skus}</span></td>
+      </tr>`;
+    })
+    .join('');
+
+  const crossFooter =
+    `<tr><td><strong>Total</strong></td>` +
+    platformOrder
+      .map((p) => {
+        const t = platformTotals.get(p)!;
+        return `<td class="num"><strong>${t.activities}</strong> <span class="small">/ ${t.skus}</span></td>`;
+      })
+      .join('') +
+    `<td class="num"><strong>${activities.length}</strong> <span class="small">/ ${activities.reduce((s, a) => s + a.sku_count, 0)}</span></td></tr>`;
 
   // Index activities so each package row can cite its parent product ID + title
   const actIndex = new Map<string, { product_id: string; title: string }>();
@@ -430,6 +506,10 @@ export function renderHTMLReport(
     a:hover { text-decoration: underline; }
     .download { display: inline-block; background: #111; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; margin-right: 8px; }
     .download:hover { background: #333; text-decoration: none; }
+    /* Cross-tab: footer row gets a top border + slight emphasis to read as totals. */
+    .crosstab tfoot td { border-top: 1px solid #d1d5db; background: #fafafa; }
+    .crosstab tbody tr:hover { background: #fafafa; }
+
     .filters { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0 10px; }
     .filters label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #333; font-weight: 500; }
     .filters select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; background: white; min-width: 140px; }
@@ -574,6 +654,19 @@ export function renderHTMLReport(
   <table>
     <thead><tr><th>Platform</th><th>Activities</th><th>SKUs</th></tr></thead>
     <tbody>${platformRows}</tbody>
+  </table>
+
+  <h2>Per-POI</h2>
+  <table>
+    <thead><tr><th>POI</th><th>Activities</th><th>SKUs</th></tr></thead>
+    <tbody>${perPoiRows}</tbody>
+  </table>
+
+  <h2>POI × Platform <span class="small" style="font-weight:400;color:#888">(activities / SKUs)</span></h2>
+  <table class="crosstab">
+    <thead><tr>${crossHeader}</tr></thead>
+    <tbody>${crossBody}</tbody>
+    <tfoot>${crossFooter}</tfoot>
   </table>
 
   <h2>Completeness gaps</h2>
