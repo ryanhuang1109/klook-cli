@@ -14,7 +14,7 @@
     "dev": "tsx src/cli.ts",
     "build": "tsc && rm -rf dist/web/public && cp -r src/web/public dist/web/public",
     "vercel-build": "npm run build && npm run vercel:prepare",
-    "vercel:prepare": "mkdir -p dist/web/public/reports dist/web/public/exports && (cp -R data/reports/. dist/web/public/reports/ 2>/dev/null || true) && (cp data/exports/*.csv dist/web/public/exports/ 2>/dev/null || true)",
+    "vercel:prepare": "mkdir -p dist/web/public/reports dist/web/public/exports && (cp -R data/reports/. dist/web/public/reports/ 2>/dev/null || true) && (cp data/exports/*.csv dist/web/public/exports/ 2>/dev/null || true) && node scripts/build-routine-state.mjs",
     "web": "node dist/web/server.js",
     "start": "node dist/cli.js",
     "test": "vitest run",

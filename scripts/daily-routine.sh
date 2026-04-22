@@ -28,6 +28,20 @@ cd "$REPO" || { echo "[$(date)] ERROR: cd $REPO failed" >>"$LOG_FILE"; exit 1; }
   echo "config: $CONFIG"
   echo
 
+  # ── Stamp host info so the Vercel landing page can show which
+  # ── machine is actually running the cron.
+  node -e '
+    const fs = require("fs");
+    const os = require("os");
+    fs.writeFileSync("data/host-info.json", JSON.stringify({
+      hostname: os.hostname(),
+      platform: os.platform(),
+      user: os.userInfo().username,
+      last_run_at: new Date().toISOString(),
+      node_version: process.version,
+    }, null, 2));
+  '
+
   # ── Pre-flight ────────────────────────────────────────────────
   echo "=== PRE-FLIGHT ==="
   if ! opencli doctor >/dev/null 2>&1; then
@@ -80,7 +94,7 @@ cd "$REPO" || { echo "[$(date)] ERROR: cd $REPO failed" >>"$LOG_FILE"; exit 1; }
   echo
 
   echo "=== GIT PUSH ==="
-  git add data/reports/latest.html data/reports/*.html data/exports/latest.csv 2>/dev/null
+  git add data/reports/latest.html data/reports/*.html data/exports/latest.csv data/host-info.json 2>/dev/null
   if git diff --cached --quiet; then
     echo "(no diff to commit)"
   else

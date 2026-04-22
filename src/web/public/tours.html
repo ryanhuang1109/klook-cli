@@ -97,6 +97,11 @@
     </form>
   </div>
 
+  <div class="card" id="routine-card">
+    <h2 style="margin-top:0; font-size:15px">Scheduled routine</h2>
+    <div id="routine-info" class="small" style="color:#555">Loading…</div>
+  </div>
+
   <div class="card">
     <h2 style="margin-top:0; font-size:15px">Recent sessions</h2>
     <table>
@@ -111,7 +116,7 @@
       </tbody>
     </table>
     <p class="small" style="margin-top:14px">
-      <a href="/api/tours/latest-report" target="_blank">View latest HTML report →</a>
+      <a href="/report" target="_blank">View latest HTML report →</a>
     </p>
   </div>
 
@@ -132,40 +137,177 @@ function cell(text, className) {
   return td;
 }
 
-async function refreshSessions() {
-  const body = document.getElementById('sessions-body');
+// Prefer the Express API when available (local dev). Fall back to the
+// static /routine-state.json that `npm run vercel:prepare` writes at
+// build time — that's what Vercel serves.
+async function fetchState() {
   try {
-    const res = await fetch('/api/tours/sessions?limit=15');
-    const sessions = await res.json();
-    body.textContent = '';
-    if (!Array.isArray(sessions) || sessions.length === 0) {
-      const row = document.createElement('tr');
-      const td = cell('(no sessions yet)', 'small');
-      td.colSpan = 7;
-      row.appendChild(td);
-      body.appendChild(row);
-      return;
+    const api = await fetch('/api/tours/sessions?limit=15');
+    if (api.ok) {
+      const sessions = await api.json();
+      let state = null;
+      try { state = await (await fetch('/routine-state.json')).json(); } catch (_e) {}
+      return { sessions, config: state && state.config, host: state && state.host, source: 'live' };
     }
-    for (const s of sessions) {
-      const row = document.createElement('tr');
-      const started = (s.started_at || '').replace('T', ' ').slice(0, 19);
-      let comps = s.competitors || '';
+  } catch (_e) { /* fall through */ }
+  const res = await fetch('/routine-state.json');
+  if (!res.ok) throw new Error('routine-state.json not available');
+  const state = await res.json();
+  return { sessions: state.sessions || [], config: state.config, host: state.host, source: 'static', generated_at: state.generated_at };
+}
+
+function fmtDate(s) {
+  return (s || '').replace('T', ' ').slice(0, 19);
+}
+
+function renderRoutineInfo(state) {
+  const box = document.getElementById('routine-info');
+  box.textContent = '';
+  const cfg = state.config;
+  const host = state.host;
+
+  if (!cfg && !host) {
+    box.textContent = 'No routine state available yet. First run will populate this card.';
+    return;
+  }
+
+  // Host + cron info
+  if (host) {
+    const hostP = document.createElement('p');
+    hostP.style.margin = '0 0 12px';
+    const line1 = document.createElement('strong');
+    line1.textContent = 'Runs on: ';
+    hostP.appendChild(line1);
+    hostP.appendChild(document.createTextNode(
+      (host.hostname || '?') + ' (' + (host.platform || '?') + ' · ' + (host.user || '?') + ')'
+    ));
+    if (host.last_run_at) {
+      hostP.appendChild(document.createElement('br'));
+      const lr = document.createElement('span');
+      lr.className = 'small';
+      lr.style.color = '#888';
+      lr.textContent = 'Last run: ' + fmtDate(host.last_run_at);
+      hostP.appendChild(lr);
+    } else if (host.note) {
+      hostP.appendChild(document.createElement('br'));
+      const n = document.createElement('span');
+      n.className = 'small';
+      n.style.color = '#888';
+      n.textContent = host.note;
+      hostP.appendChild(n);
+    }
+    box.appendChild(hostP);
+  }
+
+  // Config: competitors + limit + screenshot
+  if (cfg) {
+    const line = document.createElement('p');
+    line.style.margin = '0 0 10px';
+    const lbl = document.createElement('strong');
+    lbl.textContent = 'Competitors: ';
+    line.appendChild(lbl);
+    line.appendChild(document.createTextNode(
+      (Array.isArray(cfg.competitors) ? cfg.competitors : []).join(', ') +
+      '  ·  limit ' + cfg.limit_per_platform +
+      '  ·  screenshot ' + (cfg.screenshot ? 'on' : 'off') +
+      '  ·  sort ' + (cfg.sort || 'reviews')
+    ));
+    box.appendChild(line);
+
+    // POI table
+    if (Array.isArray(cfg.pois) && cfg.pois.length) {
+      const heading = document.createElement('p');
+      heading.style.margin = '8px 0 4px';
+      const s = document.createElement('strong');
+      s.textContent = 'POIs (' + cfg.pois.length + ')';
+      heading.appendChild(s);
+      box.appendChild(heading);
+
+      const t = document.createElement('table');
+      const thead = document.createElement('thead');
+      const thr = document.createElement('tr');
+      ['Destination', 'Keyword', 'POI label'].forEach((h) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        thr.appendChild(th);
+      });
+      thead.appendChild(thr);
+      t.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      for (const p of cfg.pois) {
+        const tr = document.createElement('tr');
+        [p.destination, p.keyword, p.poi].forEach((v) => {
+          const td = document.createElement('td');
+          td.textContent = v == null ? '' : String(v);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      }
+      t.appendChild(tbody);
+      box.appendChild(t);
+    }
+
+    // Hint about how to edit
+    const hint = document.createElement('p');
+    hint.className = 'small';
+    hint.style.cssText = 'margin:14px 0 0; color:#888';
+    hint.textContent = 'Edit data/routine-config.json in the repo, push to main, and the next run uses the new list.';
+    box.appendChild(hint);
+  }
+
+  if (state.source === 'static' && state.generated_at) {
+    const ga = document.createElement('p');
+    ga.className = 'small';
+    ga.style.cssText = 'margin:10px 0 0; color:#aaa';
+    ga.textContent = 'State snapshot from build at ' + fmtDate(state.generated_at);
+    box.appendChild(ga);
+  }
+}
+
+function renderSessions(sessions) {
+  const body = document.getElementById('sessions-body');
+  body.textContent = '';
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    const row = document.createElement('tr');
+    const td = cell('(no sessions yet)', 'small');
+    td.colSpan = 7;
+    row.appendChild(td);
+    body.appendChild(row);
+    return;
+  }
+  for (const s of sessions) {
+    const row = document.createElement('tr');
+    let comps = s.competitors || '';
+    if (Array.isArray(s.competitors)) {
+      comps = s.competitors.join(', ');
+    } else {
       try { comps = JSON.parse(s.competitors).join(', '); } catch (_e) {}
-      row.appendChild(cell(started, 'mono'));
-      row.appendChild(cell(s.destination));
-      row.appendChild(cell(s.keyword || '—'));
-      row.appendChild(cell(s.poi));
-      row.appendChild(cell(comps, 'small'));
-      const statusTd = document.createElement('td');
-      const pill = document.createElement('span');
-      pill.className = 'pill ' + (s.status || '');
-      pill.textContent = s.status || '';
-      statusTd.appendChild(pill);
-      row.appendChild(statusTd);
-      row.appendChild(cell(s.id, 'mono small'));
-      body.appendChild(row);
     }
+    row.appendChild(cell(fmtDate(s.started_at), 'mono'));
+    row.appendChild(cell(s.destination));
+    row.appendChild(cell(s.keyword || '—'));
+    row.appendChild(cell(s.poi));
+    row.appendChild(cell(comps, 'small'));
+    const statusTd = document.createElement('td');
+    const pill = document.createElement('span');
+    pill.className = 'pill ' + (s.status || '');
+    pill.textContent = s.status || '';
+    statusTd.appendChild(pill);
+    row.appendChild(statusTd);
+    row.appendChild(cell(s.id, 'mono small'));
+    body.appendChild(row);
+  }
+}
+
+async function refreshSessions() {
+  try {
+    const state = await fetchState();
+    renderRoutineInfo(state);
+    renderSessions(state.sessions);
   } catch (err) {
+    const info = document.getElementById('routine-info');
+    info.textContent = 'Failed to load routine state: ' + (err && err.message ? err.message : err);
+    const body = document.getElementById('sessions-body');
     body.textContent = '';
     const row = document.createElement('tr');
     const td = cell('Failed to load sessions.', 'small');
