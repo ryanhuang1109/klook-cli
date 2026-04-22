@@ -3,19 +3,52 @@
 #
 # POIs and knobs are defined in data/routine-config.json so this script never
 # needs editing when you add/remove a POI. Just edit the JSON and push.
+#
+# Portable: locates the repo from the script's own path (no hardcoded user
+# dir) and discovers Node via common install locations. Works on any macOS
+# or Linux box that has cloned this repo and either nvm-installed or
+# homebrew/system-installed Node 20+.
 
 set -u
 
-REPO="/Users/ryan.huang/Documents/klook/klook-cli"
+# Resolve the script's real location even when symlinked. REPO = repo root.
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -h "$SCRIPT_PATH" ]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+REPO="$(cd -P "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+
 CONFIG="$REPO/data/routine-config.json"
 LOG_DIR="$REPO/data/routine-logs"
 LOG_FILE="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 mkdir -p "$LOG_DIR"
 
-# cron runs with a minimal env — hardcode nvm node path.
-NODE_BIN="/Users/ryan.huang/.nvm/versions/node/v22.18.0/bin"
-export PATH="$NODE_BIN:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+# cron runs with a minimal env. Probe the usual Node install locations. The
+# nvm alias file (~/.nvm/alias/default) stores just a major version spec
+# like "22", so we walk ~/.nvm/versions/node/ and take the first concrete
+# install that has a node binary. Falls through to homebrew / system.
+NVM_NODE_BIN=""
+if [ -d "$HOME/.nvm/versions/node" ]; then
+  for v in "$HOME/.nvm/versions/node/"*; do
+    if [ -x "$v/bin/node" ]; then
+      NVM_NODE_BIN="$v/bin"
+      break
+    fi
+  done
+fi
+for candidate in \
+    "$NVM_NODE_BIN" \
+    /opt/homebrew/bin \
+    /usr/local/bin \
+    /usr/bin; do
+  if [ -n "$candidate" ] && [ -x "$candidate/node" ]; then
+    export PATH="$candidate:$PATH"
+    break
+  fi
+done
 
 cd "$REPO" || { echo "[$(date)] ERROR: cd $REPO failed" >>"$LOG_FILE"; exit 1; }
 
@@ -94,13 +127,19 @@ cd "$REPO" || { echo "[$(date)] ERROR: cd $REPO failed" >>"$LOG_FILE"; exit 1; }
   echo
 
   echo "=== GIT PUSH ==="
+  # Only push when the clone has a writable origin — colleagues who cloned
+  # the public repo without push access will stop at the commit and keep
+  # the data local (their own Vercel fork can auto-deploy if they set one).
   git add data/reports/latest.html data/reports/*.html data/exports/latest.csv data/host-info.json 2>/dev/null
   if git diff --cached --quiet; then
     echo "(no diff to commit)"
   else
-    git commit -m "chore(tours): daily refresh $(date +%Y-%m-%d)" \
-      && git push origin main 2>&1 \
-      && echo "push ok"
+    git commit -m "chore(tours): daily refresh $(date +%Y-%m-%d)" || echo "(commit failed)"
+    if git push origin "$(git branch --show-current)" 2>&1; then
+      echo "push ok"
+    else
+      echo "(push skipped — no write access or no remote; local commit kept)"
+    fi
   fi
 
   echo
