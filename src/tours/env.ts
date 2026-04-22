@@ -8,10 +8,31 @@
  * Call loadEnv() exactly once at CLI bootstrap.
  */
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
 let loaded = false;
+
+/**
+ * Back-compat: the installer script (install.sh) writes the OpenRouter key
+ * to ~/.klook-cli/config.json. The compare command reads from there. The
+ * newer tours pipeline prefers .env.development.local, but we also honour
+ * the legacy config.json so a fresh `install.sh` install works without the
+ * user knowing about the new env file.
+ */
+function loadLegacyConfig(): void {
+  const configPath = path.join(os.homedir(), '.klook-cli', 'config.json');
+  if (!fs.existsSync(configPath)) return;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    if (typeof cfg.openrouter_api_key === 'string' && !process.env.OPENROUTER_API_KEY) {
+      process.env.OPENROUTER_API_KEY = cfg.openrouter_api_key;
+    }
+  } catch {
+    // Malformed config — ignore.
+  }
+}
 
 export function loadEnv(cwd: string = process.cwd()): void {
   if (loaded) return;
@@ -22,6 +43,7 @@ export function loadEnv(cwd: string = process.cwd()): void {
       dotenv.config({ path: p, override: false });
     }
   }
+  loadLegacyConfig();
   loaded = true;
 }
 
@@ -30,7 +52,7 @@ export function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) {
     throw new Error(
-      `Missing required env var: ${name}. Add it to .env.development.local`,
+      `Missing required env var: ${name}. Add it to .env.development.local or ~/.klook-cli/config.json`,
     );
   }
   return v;

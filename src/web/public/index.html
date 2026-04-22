@@ -839,39 +839,44 @@
             <tr>
               <th>Platform</th>
               <th>Search</th>
-              <th>Detail</th>
-              <th>Pricing</th>
-              <th>Date Compare</th>
+              <th>Detail extraction</th>
+              <th>Supplier / orders</th>
+              <th>Agent fallback</th>
+              <th>Daily refresh</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td class="td-platform">Klook</td>
-              <td class="tok-plain">Public API</td>
-              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="tok-plain">Public API (~1s)</td>
+              <td>Packages, itinerary, inclusions, badges, languages</td>
               <td class="check">✓</td>
-              <td class="dash">—</td>
+              <td class="check">✓</td>
+              <td class="check">✓</td>
             </tr>
             <tr>
               <td class="td-platform">Trip.com</td>
-              <td class="tok-plain">Browser</td>
-              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="tok-plain">Browser bridge</td>
+              <td>SKU tabs, packages, ratings, reviews</td>
+              <td>rating / reviews / orders</td>
               <td class="check">✓</td>
               <td class="check">✓</td>
             </tr>
             <tr>
               <td class="td-platform">GetYourGuide</td>
-              <td class="tok-plain">Browser</td>
-              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="tok-plain">Browser bridge</td>
+              <td>Packages, itinerary, inclusions; language dropdown clicked</td>
+              <td>supplier (Activity provider)</td>
               <td class="check">✓</td>
-              <td class="dash">—</td>
+              <td class="check">✓</td>
             </tr>
             <tr>
               <td class="td-platform">KKday</td>
-              <td class="tok-plain">Browser</td>
-              <td>Packages + Itinerary + Inclusions + All Sections</td>
+              <td class="tok-plain">Browser bridge</td>
+              <td>Packages, inclusions, ratings</td>
+              <td>supplier, orders</td>
               <td class="check">✓</td>
-              <td class="dash">—</td>
+              <td class="check">✓</td>
             </tr>
           </tbody>
         </table>
@@ -882,44 +887,54 @@
             <tr>
               <th>平台</th>
               <th>搜尋</th>
-              <th>詳情</th>
-              <th>價格</th>
-              <th>日期比較</th>
+              <th>詳情擷取</th>
+              <th>供應商 / 訂單數</th>
+              <th>Agent fallback</th>
+              <th>每日更新</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td class="td-platform">Klook</td>
-              <td class="tok-plain">Public API</td>
-              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="tok-plain">公開 API（~1 秒）</td>
+              <td>套餐、行程、包含項目、徽章、語言</td>
               <td class="check">✓</td>
-              <td class="dash">—</td>
+              <td class="check">✓</td>
+              <td class="check">✓</td>
             </tr>
             <tr>
               <td class="td-platform">Trip.com</td>
-              <td class="tok-plain">Browser</td>
-              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="tok-plain">Browser bridge</td>
+              <td>SKU 分頁、套餐、評分、評論數</td>
+              <td>rating / reviews / orders</td>
               <td class="check">✓</td>
               <td class="check">✓</td>
             </tr>
             <tr>
               <td class="td-platform">GetYourGuide</td>
-              <td class="tok-plain">Browser</td>
-              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="tok-plain">Browser bridge</td>
+              <td>套餐、行程、包含項目；語言 dropdown 點開抓取</td>
+              <td>supplier（Activity provider）</td>
               <td class="check">✓</td>
-              <td class="dash">—</td>
+              <td class="check">✓</td>
             </tr>
             <tr>
               <td class="td-platform">KKday</td>
-              <td class="tok-plain">Browser</td>
-              <td>套餐 + 行程 + 包含項目 + 所有頁面段落</td>
+              <td class="tok-plain">Browser bridge</td>
+              <td>套餐、包含項目、評分</td>
+              <td>supplier、orders</td>
               <td class="check">✓</td>
-              <td class="dash">—</td>
+              <td class="check">✓</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+
+    <p class="small" style="color:var(--text-muted); margin-top:14px; line-height:1.55;">
+      <span data-lang="en">"Agent fallback" means: if the DOM scraper returns 0 packages (new product type, redesign, blocked), an LLM reads the visible page and extracts packages on its own. Recovered rows carry <code>agent-browser-fallback</code> in the execution log.</span>
+      <span data-lang="zh">「Agent fallback」指：DOM scraper 抓不到 packages（新商品格式、網站改版、被擋）時，LLM 直接讀可見頁面自己抽資料。恢復的筆數在 execution log 會顯示 <code>agent-browser-fallback</code>。</span>
+    </p>
   </div>
 </section>
 
