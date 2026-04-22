@@ -338,7 +338,8 @@ export function renderHTMLReport(
         .map((b) => `<span class="badge">${escapeHtml(b)}</span>`)
         .join(' ');
 
-      return `<tr>
+      // Data attributes drive the client-side filters below the h2 headings.
+      return `<tr data-poi="${escapeAttr(a.poi ?? '')}" data-platform="${escapeAttr(a.platform)}">
         <td class="img-cell">${imgCell}</td>
         <td>${PLATFORM_LABELS[a.platform] ?? a.platform}</td>
         <td>${a.poi ?? ''}</td>
@@ -358,6 +359,13 @@ export function renderHTMLReport(
     })
     .join('');
 
+  // Collect unique facets for the filter dropdowns. Sort alphabetically for
+  // stable rendering across runs.
+  const uniquePois = Array.from(new Set(activities.map((a) => a.poi).filter(Boolean))) as string[];
+  uniquePois.sort();
+  const uniquePlatforms = Array.from(new Set(activities.map((a) => a.platform)));
+  uniquePlatforms.sort();
+
   const platformRows = summary.platforms
     .map(
       (p) =>
@@ -373,7 +381,7 @@ export function renderHTMLReport(
     .map((r) => {
       const langs = JSON.parse(r.available_languages || '[]') as string[];
       const act = actIndex.get(r.activity_id);
-      return `<tr>
+      return `<tr data-poi="${escapeAttr(r.poi ?? '')}" data-platform="${escapeAttr(r.platform)}">
         <td class="small mono">${act?.product_id ?? r.activity_id}</td>
         <td class="small">${escapeHtml((act?.title ?? '').slice(0, 60))}${act && act.title.length > 60 ? '…' : ''}</td>
         <td>${PLATFORM_LABELS[r.platform] ?? r.platform}</td>
@@ -422,6 +430,9 @@ export function renderHTMLReport(
     a:hover { text-decoration: underline; }
     .download { display: inline-block; background: #111; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; margin-right: 8px; }
     .download:hover { background: #333; text-decoration: none; }
+    .filters { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0 10px; }
+    .filters label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #333; font-weight: 500; }
+    .filters select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; background: white; min-width: 140px; }
     .footer { margin-top: 40px; color: #999; font-size: 11px; }
   `;
 
@@ -443,7 +454,8 @@ export function renderHTMLReport(
   <div class="sub">Generated at ${summary.generated_at}</div>
 
   <div>
-    <a class="download" href="${csvRelPath}">Download CSV</a>
+    <a class="download" href="/csv" download="tours-latest.csv">Download CSV</a>
+    <a class="download" style="background:#fff;color:#111;border:1px solid #d1d5db" href="../exports/latest.csv" download>Download (local)</a>
   </div>
 
   ${sessions.length > 0 ? `
@@ -528,8 +540,22 @@ export function renderHTMLReport(
     </div>
   </div>
 
-  <h2>Activities (${activities.length})</h2>
-  <table>
+  <h2>Activities (<span id="act-count">${activities.length}</span>)</h2>
+  <div class="filters">
+    <label>POI
+      <select data-filter-poi="activities">
+        <option value="">All POIs</option>
+        ${uniquePois.map((p) => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('')}
+      </select>
+    </label>
+    <label>OTA
+      <select data-filter-platform="activities">
+        <option value="">All OTAs</option>
+        ${uniquePlatforms.map((p) => `<option value="${escapeAttr(p)}">${escapeHtml(PLATFORM_LABELS[p] ?? p)}</option>`).join('')}
+      </select>
+    </label>
+  </div>
+  <table id="activities-table">
     <thead><tr>
       <th style="width:120px">Hero</th>
       <th>Platform</th><th>POI</th><th>Title</th><th>Product&nbsp;ID</th>
@@ -557,14 +583,28 @@ export function renderHTMLReport(
     </tbody>
   </table>
 
-  <h2>Data (first 200 rows)</h2>
+  <h2>Data (<span id="data-count">first ${rows.length} rows</span>)</h2>
   <p class="sub">
     Currently each package shows <strong>1 SKU = 1 travel date</strong> because
     data is ingested via <code>detail</code> fallback (Klook's <code>pricing</code>
     scraper has a known calendar-nav bug). Once pricing is fixed, each package
     will fan out to N SKUs (one per day in the date window).
   </p>
-  <table>
+  <div class="filters">
+    <label>POI
+      <select data-filter-poi="data">
+        <option value="">All POIs</option>
+        ${uniquePois.map((p) => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('')}
+      </select>
+    </label>
+    <label>OTA
+      <select data-filter-platform="data">
+        <option value="">All OTAs</option>
+        ${uniquePlatforms.map((p) => `<option value="${escapeAttr(p)}">${escapeHtml(PLATFORM_LABELS[p] ?? p)}</option>`).join('')}
+      </select>
+    </label>
+  </div>
+  <table id="data-table">
     <thead><tr>
       <th>Product&nbsp;ID</th><th>Activity</th>
       <th>OTA</th><th>POI</th><th>Package</th><th>Type</th><th>Group</th><th>Meals</th>
@@ -574,6 +614,45 @@ export function renderHTMLReport(
   </table>
 
   <div class="footer">Built with klook-cli tours pipeline · opencli primitives + canonical schema · ${summary.generated_at}</div>
+
+<script>
+// Client-side filters for Activities + Data tables. Each row has
+// data-poi / data-platform attributes; the selects below the h2 headings
+// narrow the visible set and update the count badge.
+(function () {
+  function apply(tableId, countId) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var poiSel = document.querySelector('[data-filter-poi="' + (tableId === 'activities-table' ? 'activities' : 'data') + '"]');
+    var platformSel = document.querySelector('[data-filter-platform="' + (tableId === 'activities-table' ? 'activities' : 'data') + '"]');
+    var poi = poiSel ? poiSel.value : '';
+    var plat = platformSel ? platformSel.value : '';
+    var rows = table.querySelectorAll('tbody tr');
+    var visible = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var tr = rows[i];
+      var rp = tr.getAttribute('data-poi') || '';
+      var rpl = tr.getAttribute('data-platform') || '';
+      var show = (!poi || rp === poi) && (!plat || rpl === plat);
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
+    }
+    var counter = document.getElementById(countId);
+    if (counter) {
+      counter.textContent = tableId === 'activities-table'
+        ? String(visible)
+        : ('showing ' + visible + (poi || plat ? ' (filtered)' : ' rows'));
+    }
+  }
+
+  document.querySelectorAll('[data-filter-poi], [data-filter-platform]').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+      apply('activities-table', 'act-count');
+      apply('data-table', 'data-count');
+    });
+  });
+})();
+</script>
 </body>
 </html>`;
 }

@@ -1,0 +1,25 @@
+{
+  "$schema_hint": "Edit this file to change which POIs the daily routine pulls, which competitors it hits, and how many results per platform. The routine script reads this on every run — no code changes needed.",
+  "pois": [
+    {
+      "destination": "tokyo",
+      "keyword": "mt fuji",
+      "poi": "Mount Fuji"
+    },
+    {
+      "destination": "kyoto",
+      "keyword": "kiyomizu temple",
+      "poi": "Kiyomizu Temple"
+    },
+    {
+      "destination": "seoul",
+      "keyword": "dmz",
+      "poi": "DMZ"
+    }
+  ],
+  "competitors": ["klook", "trip", "getyourguide", "kkday"],
+  "limit_per_platform": 10,
+  "screenshot": true,
+  "sort": "reviews",
+  "agent_mode_on_retry": "loop"
+}
