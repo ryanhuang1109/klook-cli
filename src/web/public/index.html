@@ -738,8 +738,8 @@
     </h1>
 
     <p class="hero-subtitle">
-      <span data-lang="en">Compare activities across Klook, Trip.com, GetYourGuide, and KKday — with AI-powered clustering and price tracking.</span>
-      <span data-lang="zh">跨平台搜尋 Klook、Trip.com、GetYourGuide、KKday 的活動產品，AI 自動分組比價並追蹤價格變動。</span>
+      <span data-lang="en">Daily-refreshed Activity · Package · SKU intelligence across Klook, Trip.com, GetYourGuide, and KKday. When a site's DOM blocks the scraper, an LLM agent takes over the page. BD opens one URL every morning.</span>
+      <span data-lang="zh">每日自動更新的 Activity / Package / SKU 三層資料，涵蓋 Klook、Trip.com、GetYourGuide、KKday。網站 DOM 擋住 scraper 時，LLM agent 自動接手抓取頁面。BD 每天早上打開一個網址就看得到。</span>
     </p>
 
     <div class="hero-ctas">
@@ -778,38 +778,38 @@
       <div class="card">
         <div class="card-header-icon">🔌</div>
         <div class="card-title">
-          <span data-lang="en">Browser Bridge</span>
-          <span data-lang="zh">Browser Bridge</span>
+          <span data-lang="en">Collect</span>
+          <span data-lang="zh">擷取</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Powered by opencli, this tool uses a Chrome extension to borrow your existing login sessions. No credentials stored — if your Chrome is logged into a website, the tool can access it just like you would.</span>
-          <span data-lang="zh">基於 opencli 框架，透過 Chrome 擴充程式借用你的瀏覽器登入 session。不需要提供帳號密碼 — 只要 Chrome 有登入該網站，工具就能像你一樣操作。</span>
+          <span data-lang="en">opencli + a Chrome extension borrow your browser's real session — no stored credentials. Search + detail + dropdown-click primitives run locally and return structured JSON.</span>
+          <span data-lang="zh">opencli + Chrome 擴充程式借用你本機 Chrome 的 session，不存任何帳密。search / detail / dropdown-click 都是本機 primitive，回傳結構化 JSON。</span>
         </div>
       </div>
 
       <!-- Card 2 -->
       <div class="card">
-        <div class="card-header-icon">🔍</div>
+        <div class="card-header-icon">🧠</div>
         <div class="card-title">
-          <span data-lang="en">Search 4 Platforms</span>
-          <span data-lang="zh">搜尋 4 個平台</span>
+          <span data-lang="en">Recover</span>
+          <span data-lang="zh">修補</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Simultaneously search Klook, Trip.com, GetYourGuide, and KKday. Each platform's activities, prices, ratings, and reviews are extracted in real-time.</span>
-          <span data-lang="zh">同時搜尋 Klook、Trip.com、GetYourGuide、KKday。即時抓取各平台的活動、價格、評分、評論數。</span>
+          <span data-lang="en">When a platform's DOM doesn't match the selectors (redesign, new product type, A/B test), an LLM agent loads the page, reads the visible blocks, and extracts packages itself. One-shot by default; multi-turn loop when a dropdown or calendar needs clicking.</span>
+          <span data-lang="zh">網站 DOM 改版、遇到新商品格式或 A/B test 時，selector 抓不到，LLM agent 自動接手——讀頁面可見內容後直接抽出 packages。預設單次抽取，需要點 dropdown 或日曆時切多輪 agent loop。</span>
         </div>
       </div>
 
       <!-- Card 3 -->
       <div class="card">
-        <div class="card-header-icon">🤖</div>
+        <div class="card-header-icon">📊</div>
         <div class="card-title">
-          <span data-lang="en">AI Clustering</span>
-          <span data-lang="zh">AI 自動分組</span>
+          <span data-lang="en">Report</span>
+          <span data-lang="zh">輸出</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Results from all platforms are sent to AI (Claude via OpenRouter) that groups similar products, converts currencies to USD, and identifies the best price and highest rated option.</span>
-          <span data-lang="zh">將所有平台的結果送給 AI（Claude via OpenRouter），自動將相似產品分組、統一幣別為 USD、標出每組最低價和最高評分。</span>
+          <span data-lang="en">Everything lands in a canonical Activity → Package → SKU schema. Export to BD-ready CSV that matches the planning sheet, plus a tabbed HTML report with POI × Platform cross-tabs, hero images, real page screenshots, and filterable rows.</span>
+          <span data-lang="zh">全部匯入 Activity → Package → SKU 三層標準結構。匯出 BD 看得懂的 CSV（欄位對齊既有表格），以及分頁的 HTML 報告——有 POI × 平台交叉表、hero 圖、實際頁面截圖、可 filter 的清單。</span>
         </div>
       </div>
     </div>
@@ -940,74 +940,74 @@
 
     <div class="grid-2">
       <div class="card">
-        <div class="card-header-icon">📊</div>
+        <div class="card-header-icon">🧱</div>
         <div class="card-title">
-          <span data-lang="en">POI Monitoring</span>
-          <span data-lang="zh">POI 監控</span>
+          <span data-lang="en">Canonical 3-tier schema</span>
+          <span data-lang="zh">標準化三層結構</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Configure Points of Interest with custom keywords per platform</span>
-          <span data-lang="zh">設定監控景點，每個平台可設定不同搜尋關鍵字</span>
+          <span data-lang="en">Activity (1 per product URL) → Package (variant: language, group size, meal, vehicle) → SKU (package × travel date). Every observation gets stored so price history never overwrites.</span>
+          <span data-lang="zh">Activity（每 URL 一筆）→ Package（語言、團型、餐、車型等變體）→ SKU（package × 日期）。每次觀測都另外存一筆，歷史價格不會被覆蓋。</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header-icon">💰</div>
+        <div class="card-header-icon">📝</div>
         <div class="card-title">
-          <span data-lang="en">Price Comparison</span>
-          <span data-lang="zh">跨平台比價</span>
+          <span data-lang="en">Config-driven POIs</span>
+          <span data-lang="zh">設定檔驅動 POI</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">AI groups similar products, normalizes to USD, highlights cheapest and best-rated</span>
-          <span data-lang="zh">AI 自動分組、統一幣別、標出最優選擇</span>
+          <span data-lang="en">Edit <code>data/routine-config.json</code> to add or remove POIs, pick which OTAs to hit, and set the per-platform limit. No code changes needed — push to git, next run uses the new list.</span>
+          <span data-lang="zh">編輯 <code>data/routine-config.json</code> 加減 POI、選要跑哪幾個 OTA、設每個平台的 limit。不用改 code，push 之後下次 routine 就會用新清單。</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header-icon">📈</div>
+        <div class="card-header-icon">📸</div>
         <div class="card-title">
-          <span data-lang="en">Historical Tracking</span>
-          <span data-lang="zh">歷史追蹤</span>
+          <span data-lang="en">Hero + screenshot audit trail</span>
+          <span data-lang="zh">Hero 圖 + 實際截圖</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Save comparisons to local database, track price changes over days/weeks</span>
-          <span data-lang="zh">比價結果存入資料庫，追蹤每日價格變動</span>
+          <span data-lang="en">Every activity stores the platform's hero image plus a real page screenshot — so you can verify the scraper actually saw the current listing, not a cached fragment.</span>
+          <span data-lang="zh">每個 activity 都存平台 hero 圖 + 實際頁面截圖——確認 scraper 看到的真的是當下的頁面，不是 cache 的破碎片段。</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header-icon">🌐</div>
+        <div class="card-header-icon">🗂️</div>
         <div class="card-title">
-          <span data-lang="en">Web Dashboard</span>
-          <span data-lang="zh">Web 介面</span>
+          <span data-lang="en">POI × Platform cross-tab</span>
+          <span data-lang="zh">POI × 平台交叉表</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">BD colleagues use the web interface — no terminal needed</span>
-          <span data-lang="zh">BD 同事不需要 terminal，瀏覽器直接操作</span>
+          <span data-lang="en">The Summary tab has a matrix with POIs on rows and OTAs on columns. Each cell shows "activities / SKUs" — gaps like "0 Trip.com coverage for DMZ" jump out immediately.</span>
+          <span data-lang="zh">Summary 分頁上有一張表——列是 POI、欄是 OTA，每格「活動數 / SKU 數」。一眼看出哪裡有缺口（例如「Trip.com 在 DMZ 掛零」）。</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header-icon">📋</div>
+        <div class="card-header-icon">🧾</div>
         <div class="card-title">
-          <span data-lang="en">Full Page Extraction</span>
-          <span data-lang="zh">完整頁面擷取</span>
+          <span data-lang="en">Session + execution logs</span>
+          <span data-lang="zh">Session 與執行 log</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Extracts all page sections (What to expect, Inclusions, Itinerary, Cancellation policy, etc.) with standardised titles across platforms</span>
-          <span data-lang="zh">擷取頁面所有段落（行程介紹、包含項目、取消政策等），跨平台標題統一標準化，方便比對</span>
+          <span data-lang="en">Every routine run gets a session ID; every ingest attempt logs strategy (<code>opencli-detail</code> / <code>agent-browser-fallback</code>), duration, pkgs/SKUs written, and error. Trivial to debug yesterday's failure.</span>
+          <span data-lang="zh">每次 routine 有獨立 session ID；每次 ingest 都記 strategy（<code>opencli-detail</code> / <code>agent-browser-fallback</code>）、耗時、pkg/SKU 數量、錯誤。昨天掛哪一筆，一目了然。</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header-icon">🏷️</div>
+        <div class="card-header-icon">🕑</div>
         <div class="card-title">
-          <span data-lang="en">Standardised Section Names</span>
-          <span data-lang="zh">標準化段落名稱</span>
+          <span data-lang="en">Daily routine → Vercel</span>
+          <span data-lang="zh">每日排程 → Vercel 自動更新</span>
         </div>
         <div class="card-body">
-          <span data-lang="en">Section titles normalised to Klook naming (e.g. GYG "Includes" → "What's included"), with original platform name preserved for reference</span>
-          <span data-lang="zh">段落標題統一為 Klook 命名規範（如 GYG "Includes" → "What's included"），同時保留各平台原始標題供參考</span>
+          <span data-lang="en">System cron (or a Claude Code schedule) runs the pipeline every morning, commits the regenerated CSV + HTML, and pushes to GitHub. Vercel picks up the commit and redeploys the dashboard automatically — BD's bookmark stays valid.</span>
+          <span data-lang="zh">系統 cron（或 Claude Code schedule）每天早上跑 pipeline、commit 新的 CSV + HTML、push 到 GitHub。Vercel 自動 redeploy，BD 的 bookmark 不用改。</span>
         </div>
       </div>
     </div>
