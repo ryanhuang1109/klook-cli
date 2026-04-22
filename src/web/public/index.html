@@ -1146,145 +1146,153 @@
       <span data-lang="zh">開始使用</span>
     </div>
     <div class="section-title" style="margin-bottom: 32px;">
-      <span data-lang="en">5 Minutes to Get Started</span>
-      <span data-lang="zh">5 分鐘快速上手</span>
+      <span data-lang="en">Clone &amp; run — 5 min</span>
+      <span data-lang="zh">Clone &amp; 跑 — 5 分鐘</span>
     </div>
 
-    <!-- Step 1: Install -->
+    <!-- Step 1: Clone + build -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">1</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Install everything with one command</span>
-            <span data-lang="zh">一行指令安裝全部</span>
+            <span data-lang="en">Clone and build</span>
+            <span data-lang="zh">Clone 專案並 build</span>
           </div>
           <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
-            <span data-lang="en">This installs opencli, klook-cli, builds the Browser Bridge extension, and registers all plugins. It will also ask for your OpenRouter API key.</span>
-            <span data-lang="zh">自動安裝 opencli、klook-cli、建構 Browser Bridge 擴充程式、註冊所有平台。最後會詢問你的 OpenRouter API key。</span>
+            <span data-lang="en">Needs Node.js 20+ and a working Chrome installation.</span>
+            <span data-lang="zh">需要 Node.js 20+ 與 Chrome。</span>
           </p>
-          <pre style="margin: 0;"><code>curl -fsSL https://raw.githubusercontent.com/ryanhuang1109/klook-cli/main/install.sh | bash</code></pre>
-          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-            <span data-lang="en">After install, load the Browser Bridge extension in Chrome: chrome://extensions/ → Developer Mode → Load unpacked → select /tmp/opencli-extension/extension</span>
-            <span data-lang="zh">安裝完成後，在 Chrome 載入擴充程式：chrome://extensions/ → 開發者模式 → 載入未封裝項目 → 選擇 /tmp/opencli-extension/extension</span>
-          </p>
+          <pre style="margin: 0;"><code>git clone https://github.com/ryanhuang1109/klook-cli.git
+cd klook-cli
+npm install
+npm run build</code></pre>
         </div>
       </div>
     </div>
 
-    <!-- Step 2: Open project in Claude Code -->
+    <!-- Step 2: opencli + Chrome extension -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">2</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Open the project in Claude Code</span>
-            <span data-lang="zh">用 Claude Code 開啟專案目錄</span>
+            <span data-lang="en">Install opencli + load the Chrome extension</span>
+            <span data-lang="zh">安裝 opencli 並載入 Chrome 擴充</span>
           </div>
           <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
-            <span data-lang="en">Claude Code will automatically read CLAUDE.md and understand all available commands.</span>
-            <span data-lang="zh">Claude Code 會自動讀取 CLAUDE.md，了解所有可用指令。</span>
+            <span data-lang="en">opencli ships a Chrome extension that borrows your existing browser sessions — no stored credentials.</span>
+            <span data-lang="zh">opencli 附一個 Chrome 擴充，借用你本機 Chrome 的登入 session，不存帳密。</span>
           </p>
-          <pre style="margin: 0;"><code>cd ~/klook-cli && claude</code></pre>
+          <pre style="margin: 0;"><code>npm install -g @jackwener/opencli</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">
+            <span data-lang="en">Then in Chrome: chrome://extensions/ → Developer Mode → Load unpacked → select <code>/tmp/opencli-extension/extension</code> (opencli will print the exact path on first run).</span>
+            <span data-lang="zh">然後 Chrome：chrome://extensions/ → 開發者模式 → 載入未封裝項目 → 選 <code>/tmp/opencli-extension/extension</code>（opencli 首次執行會顯示完整路徑）。</span>
+          </p>
         </div>
       </div>
     </div>
 
-    <!-- Step 3: Set OpenRouter API key -->
+    <!-- Step 3: Verify -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">3</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Set your OpenRouter API key (for AI comparison)</span>
-            <span data-lang="zh">設定 OpenRouter API key（AI 比價功能需要）</span>
+            <span data-lang="en">Verify Browser Bridge is up</span>
+            <span data-lang="zh">確認 Browser Bridge 連線正常</span>
           </div>
-          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.6;">
-            <span data-lang="en">Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a>, then run:</span>
-            <span data-lang="zh">先到 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a> 取得 key，然後執行：</span>
-          </p>
-          <pre style="margin: 0;"><code><span data-lang="en"># Preferred: project-local env file (tours pipeline reads this first)</span><span data-lang="zh"># 建議：放在專案目錄（tours pipeline 優先讀這個）</span>
-echo 'OPENROUTER_API_KEY="YOUR-KEY-HERE"' &gt; ~/klook-cli/.env.development.local</code></pre>
+          <pre style="margin: 0;"><code>opencli doctor</code></pre>
           <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-            <span data-lang="en">The legacy <code>~/.klook-cli/config.json</code> path (written by install.sh) still works as a fallback — skip this step if the installer already filled it in.</span>
-            <span data-lang="zh">舊的 <code>~/.klook-cli/config.json</code>（install.sh 會寫入）仍然可用，當 fallback。如果 installer 已填好可以跳過這步。</span>
+            <span data-lang="en">Should print three [OK] lines — Daemon, Extension, Connectivity.</span>
+            <span data-lang="zh">要看到三個 [OK]：Daemon、Extension、Connectivity。</span>
           </p>
         </div>
       </div>
     </div>
 
-    <!-- Step 4: Verify Browser Bridge -->
+    <!-- Step 4: Configure POIs -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-blue);">4</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Verify Browser Bridge connection</span>
-            <span data-lang="zh">確認 Browser Bridge 已連線</span>
+            <span data-lang="en">Pick your POIs</span>
+            <span data-lang="zh">設定要監控的 POI</span>
           </div>
           <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
-            <span data-lang="en">Make sure Chrome is open with the Browser Bridge extension loaded.</span>
-            <span data-lang="zh">確保 Chrome 已開啟且 Browser Bridge 擴充程式已載入。</span>
-          </p>
-          <pre style="margin: 0;"><code>opencli doctor</code></pre>
-          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-            <span data-lang="en">You should see: [OK] Daemon: running, [OK] Extension: connected, [OK] Connectivity: connected</span>
-            <span data-lang="zh">應該顯示：[OK] Daemon: running, [OK] Extension: connected, [OK] Connectivity: connected</span>
+            <span data-lang="en">Edit <code>data/routine-config.json</code> — the <code>pois</code> array drives every run. Each entry has a <code>destination</code>, a search <code>keyword</code>, and a human-readable <code>poi</code> label.</span>
+            <span data-lang="zh">編輯 <code>data/routine-config.json</code>——<code>pois</code> 陣列決定每次 run 的目標。每筆三個欄位：<code>destination</code>、搜尋 <code>keyword</code>、顯示用 <code>poi</code> 名稱。</span>
           </p>
         </div>
       </div>
     </div>
 
-    <!-- Step 5: Run the tours pipeline (the daily workflow) -->
+    <!-- Step 5: Run the pipeline -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">5</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Run the tours pipeline</span>
-            <span data-lang="zh">跑 tours pipeline</span>
+            <span data-lang="en">Run the pipeline</span>
+            <span data-lang="zh">跑 pipeline</span>
           </div>
           <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
-            <span data-lang="en">Edit <code>data/routine-config.json</code> to set your POIs, then trigger a run. CSV + HTML report land in <code>data/exports/</code> and <code>data/reports/</code>.</span>
-            <span data-lang="zh">編輯 <code>data/routine-config.json</code> 設定 POI，然後觸發一次。CSV + HTML 報告會輸出到 <code>data/exports/</code> 與 <code>data/reports/</code>。</span>
+            <span data-lang="en">CSV + HTML report land in <code>data/exports/</code> and <code>data/reports/</code>.</span>
+            <span data-lang="zh">CSV + HTML 報告會輸出到 <code>data/exports/</code> 與 <code>data/reports/</code>。</span>
           </p>
           <div style="display: flex; flex-direction: column; gap: 8px;">
-            <pre style="margin: 0;"><code><span data-lang="en"># One-off: run every POI in routine-config.json</span><span data-lang="zh"># 一次性：依 routine-config.json 跑所有 POI</span>
+            <pre style="margin: 0;"><code><span data-lang="en"># Every POI in routine-config.json</span><span data-lang="zh"># 依 routine-config.json 跑所有 POI</span>
 bash scripts/daily-routine.sh</code></pre>
-            <pre style="margin: 0;"><code><span data-lang="en"># Or ad-hoc: one destination + keyword</span><span data-lang="zh"># 或單次：指定一個 destination + keyword</span>
+            <pre style="margin: 0;"><code><span data-lang="en"># Or single destination + keyword</span><span data-lang="zh"># 或單次：指定 destination + keyword</span>
 node dist/cli.js tours run \
   --destination tokyo --keyword "mt fuji" \
   --competitors klook,trip,getyourguide,kkday \
   --limit 10 --screenshot</code></pre>
           </div>
           <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height:1.55;">
-            <span data-lang="en">Open <code>data/reports/latest.html</code> when it's done — or point Chrome at <code>http://localhost:17890/tours</code> after <code>npm run web</code> for the form-based trigger.</span>
-            <span data-lang="zh">跑完後開 <code>data/reports/latest.html</code>，或執行 <code>npm run web</code> 後造訪 <code>http://localhost:17890/tours</code> 用表單觸發。</span>
+            <span data-lang="en">Open <code>data/reports/latest.html</code> when it's done — or run <code>npm run web</code> and visit <code>http://localhost:17890/tours</code> for the form-based trigger.</span>
+            <span data-lang="zh">跑完後開 <code>data/reports/latest.html</code>，或 <code>npm run web</code> 後造訪 <code>http://localhost:17890/tours</code> 用表單觸發。</span>
           </p>
         </div>
       </div>
     </div>
 
-    <!-- Step 6: Automate with cron -->
-    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+    <!-- Step 6: Daily cron (optional) -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px; opacity: 0.92;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
-        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">6</div>
+        <div style="background: rgba(255,255,255,0.04); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--text-dim);">6</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Schedule a daily refresh (optional)</span>
-            <span data-lang="zh">排每日自動更新（選用）</span>
+            <span data-lang="en">Daily refresh <span style="color:var(--text-muted); font-weight:400; font-size:12px; margin-left:4px;">optional</span></span>
+            <span data-lang="zh">每日自動更新 <span style="color:var(--text-muted); font-weight:400; font-size:12px; margin-left:4px;">選用</span></span>
           </div>
           <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
-            <span data-lang="en">macOS / Linux: add one line to your crontab. macOS also needs Full Disk Access for <code>/usr/sbin/cron</code> in System Settings → Privacy &amp; Security.</span>
-            <span data-lang="zh">macOS / Linux：crontab 加一行。macOS 還要去 System Settings → Privacy &amp; Security → Full Disk Access 把 <code>/usr/sbin/cron</code> 加進去。</span>
+            <span data-lang="en">macOS / Linux — one crontab line. macOS also needs Full Disk Access for <code>/usr/sbin/cron</code> under System Settings → Privacy &amp; Security.</span>
+            <span data-lang="zh">macOS / Linux：crontab 加一行。macOS 還要到 System Settings → Privacy &amp; Security → Full Disk Access 把 <code>/usr/sbin/cron</code> 加進去。</span>
           </p>
           <pre style="margin: 0;"><code>crontab -e
-<span data-lang="en"># then add (adjust the path to your clone)</span><span data-lang="zh"># 然後加上（請改成你 clone 的絕對路徑）</span>
+<span data-lang="en"># then append (use the absolute path to your clone)</span><span data-lang="zh"># 加上這行（用你 clone 的絕對路徑）</span>
 3 10 * * * /absolute/path/to/klook-cli/scripts/daily-routine.sh</code></pre>
-          <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height:1.55;">
-            <span data-lang="en">The script is portable — resolves its own repo path and discovers Node automatically. Each run logs to <code>data/routine-logs/YYYY-MM-DD.log</code>.</span>
-            <span data-lang="zh">Script 是可攜的——自己解析 repo 位置、自動找 Node。每次跑會寫 log 到 <code>data/routine-logs/YYYY-MM-DD.log</code>。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 7: OpenRouter (optional — analysis) -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px; opacity: 0.92;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.04); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--text-dim);">7</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">OpenRouter API key <span style="color:var(--text-muted); font-weight:400; font-size:12px; margin-left:4px;">optional — only for AI analysis</span></span>
+            <span data-lang="zh">OpenRouter API key <span style="color:var(--text-muted); font-weight:400; font-size:12px; margin-left:4px;">選用：AI 分析才需要</span></span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">Only needed when the DOM scraper fails and the LLM agent-browser fallback has to take over, or when you use <code>match-from-url</code> for cross-platform matching. Normal scrapes don't need it.</span>
+            <span data-lang="zh">只有在 DOM scraper 抓不到、需要 LLM agent-browser fallback 接手，或用 <code>match-from-url</code> 做跨平台配對時才需要。正常抓取不用。</span>
           </p>
+          <pre style="margin: 0;"><code><span data-lang="en"># Grab a key from openrouter.ai/keys, then:</span><span data-lang="zh"># 到 openrouter.ai/keys 申請 key，然後：</span>
+echo 'OPENROUTER_API_KEY="sk-or-..."' &gt; .env.development.local</code></pre>
         </div>
       </div>
     </div>
