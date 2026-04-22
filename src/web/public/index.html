@@ -1203,11 +1203,11 @@
             <span data-lang="en">Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a>, then run:</span>
             <span data-lang="zh">先到 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color: var(--accent-blue);">openrouter.ai/keys</a> 取得 key，然後執行：</span>
           </p>
-          <pre style="margin: 0;"><code>mkdir -p ~/.klook-cli
-echo '{"openrouter_api_key":"YOUR-KEY-HERE"}' > ~/.klook-cli/config.json</code></pre>
+          <pre style="margin: 0;"><code><span data-lang="en"># Preferred: project-local env file (tours pipeline reads this first)</span><span data-lang="zh"># 建議：放在專案目錄（tours pipeline 優先讀這個）</span>
+echo 'OPENROUTER_API_KEY="YOUR-KEY-HERE"' &gt; ~/klook-cli/.env.development.local</code></pre>
           <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-            <span data-lang="en">Skip this step if you already set the key during installation.</span>
-            <span data-lang="zh">如果安裝時已經設定過，可以跳過這步。</span>
+            <span data-lang="en">The legacy <code>~/.klook-cli/config.json</code> path (written by install.sh) still works as a fallback — skip this step if the installer already filled it in.</span>
+            <span data-lang="zh">舊的 <code>~/.klook-cli/config.json</code>（install.sh 會寫入）仍然可用，當 fallback。如果 installer 已填好可以跳過這步。</span>
           </p>
         </div>
       </div>
@@ -1235,25 +1235,56 @@ echo '{"openrouter_api_key":"YOUR-KEY-HERE"}' > ~/.klook-cli/config.json</code><
       </div>
     </div>
 
-    <!-- Step 5: Start asking -->
+    <!-- Step 5: Run the tours pipeline (the daily workflow) -->
     <div class="card" style="margin-bottom: 16px; padding: 24px;">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">5</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
-            <span data-lang="en">Start asking! Use natural language in Claude Code</span>
-            <span data-lang="zh">開始使用！在 Claude Code 中用自然語言提問</span>
+            <span data-lang="en">Run the tours pipeline</span>
+            <span data-lang="zh">跑 tours pipeline</span>
           </div>
           <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
-            <span data-lang="en">Just tell it what you want. Here are some examples:</span>
-            <span data-lang="zh">直接告訴它你想查什麼，例如：</span>
+            <span data-lang="en">Edit <code>data/routine-config.json</code> to set your POIs, then trigger a run. CSV + HTML report land in <code>data/exports/</code> and <code>data/reports/</code>.</span>
+            <span data-lang="zh">編輯 <code>data/routine-config.json</code> 設定 POI，然後觸發一次。CSV + HTML 報告會輸出到 <code>data/exports/</code> 與 <code>data/reports/</code>。</span>
           </p>
           <div style="display: flex; flex-direction: column; gap: 8px;">
-            <pre style="margin: 0;"><code><span data-lang="en">Find Mt Fuji day tours and compare prices across all platforms</span><span data-lang="zh">幫我找富士山一日遊，四個平台比價</span></code></pre>
-            <pre style="margin: 0;"><code><span data-lang="en">Show me USJ ticket packages and prices on Klook</span><span data-lang="zh">查一下 Klook 上 USJ 門票的套餐和價格</span></code></pre>
-            <pre style="margin: 0;"><code><span data-lang="en">Compare Trip.com Mt Fuji tour prices for the next 3 days</span><span data-lang="zh">看一下 Trip.com 富士山 tour 未來三天的價格差異</span></code></pre>
-            <pre style="margin: 0;"><code><span data-lang="en">Track price changes for Mt Fuji tours over the past week</span><span data-lang="zh">追蹤富士山 tour 過去一週的價格變動</span></code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en"># One-off: run every POI in routine-config.json</span><span data-lang="zh"># 一次性：依 routine-config.json 跑所有 POI</span>
+bash scripts/daily-routine.sh</code></pre>
+            <pre style="margin: 0;"><code><span data-lang="en"># Or ad-hoc: one destination + keyword</span><span data-lang="zh"># 或單次：指定一個 destination + keyword</span>
+node dist/cli.js tours run \
+  --destination tokyo --keyword "mt fuji" \
+  --competitors klook,trip,getyourguide,kkday \
+  --limit 10 --screenshot</code></pre>
           </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height:1.55;">
+            <span data-lang="en">Open <code>data/reports/latest.html</code> when it's done — or point Chrome at <code>http://localhost:17890/tours</code> after <code>npm run web</code> for the form-based trigger.</span>
+            <span data-lang="zh">跑完後開 <code>data/reports/latest.html</code>，或執行 <code>npm run web</code> 後造訪 <code>http://localhost:17890/tours</code> 用表單觸發。</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: Automate with cron -->
+    <div class="card" style="margin-bottom: 16px; padding: 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 600; font-size: 14px; color: var(--accent-green);">6</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">
+            <span data-lang="en">Schedule a daily refresh (optional)</span>
+            <span data-lang="zh">排每日自動更新（選用）</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6;">
+            <span data-lang="en">macOS / Linux: add one line to your crontab. macOS also needs Full Disk Access for <code>/usr/sbin/cron</code> in System Settings → Privacy &amp; Security.</span>
+            <span data-lang="zh">macOS / Linux：crontab 加一行。macOS 還要去 System Settings → Privacy &amp; Security → Full Disk Access 把 <code>/usr/sbin/cron</code> 加進去。</span>
+          </p>
+          <pre style="margin: 0;"><code>crontab -e
+<span data-lang="en"># then add (adjust the path to your clone)</span><span data-lang="zh"># 然後加上（請改成你 clone 的絕對路徑）</span>
+3 10 * * * /absolute/path/to/klook-cli/scripts/daily-routine.sh</code></pre>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height:1.55;">
+            <span data-lang="en">The script is portable — resolves its own repo path and discovers Node automatically. Each run logs to <code>data/routine-logs/YYYY-MM-DD.log</code>.</span>
+            <span data-lang="zh">Script 是可攜的——自己解析 repo 位置、自動找 Node。每次跑會寫 log 到 <code>data/routine-logs/YYYY-MM-DD.log</code>。</span>
+          </p>
         </div>
       </div>
     </div>
