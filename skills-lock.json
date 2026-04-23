@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "skills": {
+    "opencli-adapter-author": {
+      "source": "jackwener/opencli",
+      "sourceType": "github",
+      "computedHash": "a421408acfd4daf5522eb0a78ad3aeab3d0f0c14828955a0d71f8ad8c893575c"
+    },
+    "opencli-autofix": {
+      "source": "jackwener/opencli",
+      "sourceType": "github",
+      "computedHash": "cf75a29ded3e92156a9896cc7fe44d3986f68752c9badd0f13477c94723516ef"
+    },
+    "opencli-browser": {
+      "source": "jackwener/opencli",
+      "sourceType": "github",
+      "computedHash": "8e1293455bf01ebc20750b611017d343a02c5995106f67c2710b474202d10204"
+    },
+    "opencli-usage": {
+      "source": "jackwener/opencli",
+      "sourceType": "github",
+      "computedHash": "49bc9903c12dfe10501e110325e8ec6c57b5d0ece684ede004162eed3e839851"
+    },
+    "smart-search": {
+      "source": "jackwener/opencli",
+      "sourceType": "github",
+      "computedHash": "61a26736228394d2f017b38570c221a5005b9bab47b1b52053e9fbd7047bc970"
+    }
+  }
+}

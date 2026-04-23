@@ -41,7 +41,8 @@ function mapCard(card: any): Record<string, string> {
 
 cli({
   site: 'klook',
-  name: 'search',
+  name: 'search-activities',
+  aliases: ['search'],
   description: 'Search Klook activities, tickets, and experiences',
   domain: 'www.klook.com',
   strategy: Strategy.PUBLIC,

@@ -87,7 +87,8 @@ export function buildTrendingEvaluate(limit: number): string {
 
 cli({
   site: 'klook',
-  name: 'trending',
+  name: 'list-trending',
+  aliases: ['trending'],
   description: 'Show trending activities for a city on Klook',
   domain: 'www.klook.com',
   strategy: Strategy.COOKIE,

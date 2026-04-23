@@ -50,7 +50,8 @@ export function buildSearchEvaluate(limit: number): string {
 
 cli({
   site: 'getyourguide',
-  name: 'search',
+  name: 'search-activities',
+  aliases: ['search'],
   description: 'Search GetYourGuide activities, tickets, and tours',
   domain: 'www.getyourguide.com',
   strategy: Strategy.COOKIE,

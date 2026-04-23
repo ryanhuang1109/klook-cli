@@ -265,8 +265,9 @@ export function buildDetailEvaluate(): string {
 
 cli({
   site: 'klook',
-  name: 'detail',
-  description: 'Show full activity detail, itinerary, packages, and pricing from Klook',
+  name: 'get-activity',
+  aliases: ['detail'],
+  description: 'Get full activity payload: title, packages, itinerary, sections, rating, images (Klook)',
   domain: 'www.klook.com',
   strategy: Strategy.COOKIE,
   browser: true,

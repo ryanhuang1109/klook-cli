@@ -133,7 +133,8 @@ const READ_CURRENT_PRICE_JS = `
 
 cli({
   site: 'trip',
-  name: 'pricing',
+  name: 'get-pricing-matrix',
+  aliases: ['pricing'],
   description: 'Extract per-SKU × per-date pricing for the next N days',
   domain: 'www.trip.com',
   strategy: Strategy.COOKIE,

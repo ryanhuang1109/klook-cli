@@ -214,7 +214,8 @@ export function buildDetailEvaluate(): string {
 
 cli({
   site: 'kkday',
-  name: 'detail',
+  name: 'get-activity',
+  aliases: ['detail'],
   description: 'Show KKday activity detail with package pricing',
   domain: 'www.kkday.com',
   strategy: Strategy.COOKIE,

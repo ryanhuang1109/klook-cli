@@ -192,7 +192,8 @@ const CALENDAR_IS_OPEN_JS = `
 
 cli({
   site: 'klook',
-  name: 'pricing',
+  name: 'get-pricing-matrix',
+  aliases: ['pricing'],
   description: 'Extract per-package × per-date pricing for the next N days',
   domain: 'www.klook.com',
   strategy: Strategy.COOKIE,

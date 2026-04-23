@@ -52,7 +52,8 @@ export function buildSearchEvaluate(limit: number): string {
 
 cli({
   site: 'kkday',
-  name: 'search',
+  name: 'search-activities',
+  aliases: ['search'],
   description: 'Search KKday activities, tickets, and tours',
   domain: 'www.kkday.com',
   strategy: Strategy.COOKIE,

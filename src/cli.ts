@@ -114,63 +114,91 @@ for (const [key, cmd] of registry) {
 }
 
 // ── POI commands ──────────────────────────────────────────────────
-const poiCmd = program.command('poi').description('Manage POIs (Points of Interest) to monitor');
+// Canonical top-level commands: add-poi / list-pois / remove-poi
+// Legacy subcommand group: poi add / poi list / poi remove (still supported)
+async function actionAddPoi(name: string, opts: { keywords: string; platforms: string }) {
+  const { addPoi } = await import('./poi/poi.js');
+  try {
+    addPoi(undefined, {
+      name,
+      keywords: opts.keywords.split(',').map((k) => k.trim()),
+      platforms: opts.platforms.split(',').map((p) => p.trim()),
+    });
+    console.log(`Added POI: ${name}`);
+  } catch (err: unknown) {
+    console.error(`Error: ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
+}
 
-poiCmd
-  .command('add <name>')
+async function actionListPois() {
+  const { loadPois } = await import('./poi/poi.js');
+  const pois = loadPois();
+  if (pois.length === 0) {
+    console.log('No POIs configured. Run: klook-cli add-poi "..." --keywords "..."');
+    return;
+  }
+  for (const poi of pois) {
+    console.log(`${poi.name}`);
+    console.log(`  Keywords: ${poi.keywords.join(', ')}`);
+    console.log(`  Platforms: ${poi.platforms.join(', ')}`);
+    console.log('');
+  }
+}
+
+async function actionRemovePoi(name: string) {
+  const { removePoi } = await import('./poi/poi.js');
+  try {
+    removePoi(undefined, name);
+    console.log(`Removed POI: ${name}`);
+  } catch (err: unknown) {
+    console.error(`Error: ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
+}
+
+// Canonical top-level
+program
+  .command('add-poi <name>')
   .description('Add a POI to monitor')
   .requiredOption('--keywords <keywords>', 'Comma-separated search keywords')
   .option('--platforms <platforms>', 'Comma-separated platforms', 'klook,trip,getyourguide,kkday')
-  .action(async (name: string, opts: { keywords: string; platforms: string }) => {
-    const { addPoi } = await import('./poi/poi.js');
-    try {
-      addPoi(undefined, {
-        name,
-        keywords: opts.keywords.split(',').map((k) => k.trim()),
-        platforms: opts.platforms.split(',').map((p) => p.trim()),
-      });
-      console.log(`Added POI: ${name}`);
-    } catch (err: unknown) {
-      console.error(`Error: ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
+  .action(actionAddPoi);
+
+program
+  .command('list-pois')
+  .description('List all configured POIs')
+  .action(actionListPois);
+
+program
+  .command('remove-poi <name>')
+  .description('Remove a POI')
+  .action(actionRemovePoi);
+
+// Legacy subcommand group (aliases for backwards compat)
+const poiCmd = program.command('poi').description('Manage POIs (alias group — prefer add-poi / list-pois / remove-poi)');
+
+poiCmd
+  .command('add <name>')
+  .description('Add a POI to monitor (alias: add-poi)')
+  .requiredOption('--keywords <keywords>', 'Comma-separated search keywords')
+  .option('--platforms <platforms>', 'Comma-separated platforms', 'klook,trip,getyourguide,kkday')
+  .action(actionAddPoi);
 
 poiCmd
   .command('list')
-  .description('List all configured POIs')
-  .action(async () => {
-    const { loadPois } = await import('./poi/poi.js');
-    const pois = loadPois();
-    if (pois.length === 0) {
-      console.log('No POIs configured. Run: klook-cli poi add "..." --keywords "..."');
-      return;
-    }
-    for (const poi of pois) {
-      console.log(`${poi.name}`);
-      console.log(`  Keywords: ${poi.keywords.join(', ')}`);
-      console.log(`  Platforms: ${poi.platforms.join(', ')}`);
-      console.log('');
-    }
-  });
+  .description('List all configured POIs (alias: list-pois)')
+  .action(actionListPois);
 
 poiCmd
   .command('remove <name>')
-  .description('Remove a POI')
-  .action(async (name: string) => {
-    const { removePoi } = await import('./poi/poi.js');
-    try {
-      removePoi(undefined, name);
-      console.log(`Removed POI: ${name}`);
-    } catch (err: unknown) {
-      console.error(`Error: ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
+  .description('Remove a POI (alias: remove-poi)')
+  .action(actionRemovePoi);
 
 // ── Compare command ───────────────────────────────────────────────
 program
-  .command('compare [name]')
+  .command('compare-poi [name]')
+  .alias('compare')
   .description('Compare a POI across platforms (or --all for all POIs)')
   .option('--date <date>', 'Date for pricing (YYYY-MM-DD)')
   .option('--all', 'Run comparison for all configured POIs')
@@ -210,7 +238,8 @@ const toursCmd = program
   .description('Tours pipeline: ingest pricing, export to CSV, generate HTML report, cross-platform match');
 
 toursCmd
-  .command('ingest <platform> <activity-id>')
+  .command('ingest-pricing <platform> <activity-id>')
+  .alias('ingest')
   .description('Run opencli pricing for one activity and store in tours DB')
   .option('--poi <poi>', 'POI label (e.g. "Mount Fuji")')
   .option('--days <n>', 'Days of pricing to fetch', '7')
@@ -232,8 +261,9 @@ toursCmd
   });
 
 toursCmd
-  .command('ingest-detail <platform> <activity-id>')
-  .description('Fallback ingest using opencli <platform> detail (works when pricing scraper fails)')
+  .command('ingest-from-detail <platform> <activity-id>')
+  .alias('ingest-detail')
+  .description('Fallback ingest using opencli <platform> get-activity (works when pricing scraper fails)')
   .option('--poi <poi>', 'POI label')
   .option('--url <url>', 'Canonical URL override')
   .option('--travel-date <d>', 'Travel date label for the stored SKUs (default: tomorrow)')
@@ -258,8 +288,9 @@ toursCmd
   });
 
 toursCmd
-  .command('run')
-  .description('End-to-end: iterate each competitor, ingest-search, then export CSV + HTML report')
+  .command('run-daily-routine')
+  .alias('run')
+  .description('End-to-end: iterate each competitor, ingest-top-from-search, then export CSV + HTML report')
   .requiredOption('--destination <d>', 'Destination (e.g. "bangkok", "tokyo")')
   .option('--keyword <k>', 'Subvertical / theme keyword (e.g. "temple", "river cruise")', '')
   .requiredOption('--competitors <list>', 'Comma-separated platforms: klook,trip,getyourguide,kkday')
@@ -286,8 +317,9 @@ toursCmd
   });
 
 toursCmd
-  .command('ingest-search <platform> <keyword>')
-  .description('Search opencli for keyword, rank by review count, ingest top N via detail fallback')
+  .command('ingest-top-from-search <platform> <keyword>')
+  .alias('ingest-search')
+  .description('Search opencli for keyword, rank by review count, ingest top N via get-activity fallback')
   .requiredOption('--poi <poi>', 'POI label to assign to discovered activities')
   .option('--limit <n>', 'Top N results to ingest after ranking (default 30)', '30')
   .option('--sort <key>', 'Sort before ingest: reviews (default) or recommended', 'reviews')
@@ -310,7 +342,8 @@ toursCmd
   });
 
 toursCmd
-  .command('ingest-snapshot <platform> <file>')
+  .command('ingest-from-snapshot <platform> <file>')
+  .alias('ingest-snapshot')
   .description('Ingest a previously saved pricing JSON snapshot (skips scraping)')
   .option('--poi <poi>', 'POI label')
   .option('--url <url>', 'Canonical URL override')
@@ -325,7 +358,8 @@ toursCmd
   });
 
 toursCmd
-  .command('ingest-from-golden <csv>')
+  .command('ingest-from-planning-csv <csv>')
+  .alias('ingest-from-golden')
   .description('Read the planning CSV, ingest all unique (platform, activity_id) targets')
   .option('--platforms <list>', 'Comma-separated platforms to include')
   .option('--days <n>', 'Days of pricing to fetch', '7')
@@ -348,7 +382,8 @@ toursCmd
   });
 
 toursCmd
-  .command('export')
+  .command('export-csv')
+  .alias('export')
   .description('Export the tours DB to a CSV matching the planning sheet format')
   .option('--out <path>', 'Output CSV path (default: data/exports/<today>.csv)')
   .option('--pois <list>', 'Comma-separated POIs to include')
@@ -370,7 +405,8 @@ toursCmd
   });
 
 toursCmd
-  .command('report')
+  .command('generate-report')
+  .alias('report')
   .description('Generate HTML summary report (coverage, completeness, recent rows)')
   .option('--out <path>', 'Output HTML path')
   .action(async (opts: any) => {
@@ -384,7 +420,8 @@ toursCmd
   });
 
 toursCmd
-  .command('list')
+  .command('list-activities')
+  .alias('list')
   .description('List all activities currently in the tours DB')
   .option('--platform <p>', 'Filter by platform')
   .option('--poi <poi>', 'Filter by POI')
@@ -395,7 +432,8 @@ toursCmd
   });
 
 toursCmd
-  .command('review-sku <sku-id> <status>')
+  .command('set-sku-review-status <sku-id> <status>')
+  .alias('review-sku')
   .description('Mark an SKU as verified | flagged | rejected | unverified')
   .option('--note <note>', 'Reason / note for the review')
   .action(async (skuId: string, status: string, opts: any) => {
@@ -409,7 +447,8 @@ toursCmd
   });
 
 toursCmd
-  .command('review-activity <id> <status>')
+  .command('set-activity-review-status <id> <status>')
+  .alias('review-activity')
   .description('Mark an activity as verified | flagged | rejected | unverified')
   .option('--note <note>', 'Reason / note for the review')
   .action(async (id: string, status: string, opts: any) => {
@@ -423,7 +462,8 @@ toursCmd
   });
 
 toursCmd
-  .command('match-from-url <url>')
+  .command('find-cross-platform-match <url>')
+  .alias('match-from-url')
   .description('Given a URL on one platform, find similar tours on another (LLM-ranked)')
   .requiredOption('--to <platform>', 'Target platform (trip, kkday, getyourguide, klook)')
   .option('-f, --format <fmt>', 'Output format: text, json', 'text')
@@ -447,7 +487,8 @@ toursCmd
 
 // ── Compare history command ───────────────────────────────────────
 program
-  .command('compare-history <name>')
+  .command('get-poi-price-history <name>')
+  .alias('compare-history')
   .description('Show price change history for a POI')
   .option('--days <n>', 'Number of days to look back', '7')
   .action(async (name: string, opts: { days: string }) => {

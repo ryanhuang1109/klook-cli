@@ -2,78 +2,84 @@
 
 You have access to a travel activity CLI that searches and compares prices across 4 platforms: Klook, Trip.com, GetYourGuide, and KKday.
 
+## Skills (start here for platform / workflow tasks)
+
+Platform-specific and cross-platform playbooks live as skills under `.claude/skills/`:
+
+| Skill | Purpose | Owner |
+|---|---|---|
+| `opencli-router` | Dispatches any opencli / OTA request to the right specialist | shared |
+| `opencli-klook` | Klook commands + quirks (reference template) | Ryan Huang |
+| `opencli-trip` | Trip.com commands + quirks | TODO |
+| `opencli-getyourguide` | GetYourGuide commands + quirks | TODO |
+| `opencli-kkday` | KKday commands + quirks | TODO |
+| `opencli-tours-routine` | Daily tours ingest → export → report playbook | shared |
+| `opencli-compare-poi` | Cross-platform POI compare workflow | shared |
+
+When a user mentions a specific platform or workflow, invoke the matching skill before running commands. `grep "^- \*\*Owner\*\*:" .claude/skills/*/SKILL.md` to find the maintainer of any platform skill.
+
+To add a skill for a **new** platform (e.g. Viator), see `docs/skill-template-platform.md`. Existing platform owners should fill the TODOs in their stub (`opencli-trip` / `opencli-getyourguide` / `opencli-kkday`) using `opencli-klook` as the reference.
+
 ## Available Commands
+
+Old names (`search` / `detail` / `pricing` / `trending`, `poi add`, `compare`, `compare-history`) still work as aliases — you will not break scheduled routines or existing scripts. Full command reference: `docs/platform-capabilities.md`.
 
 ### Search activities on a single platform
 
 ```bash
-opencli klook search "<keyword>" --limit <N>
-opencli trip search "<keyword>" --limit <N>
-opencli getyourguide search "<keyword>" --limit <N>
-opencli kkday search "<keyword>" --limit <N>
+opencli klook search-activities "<keyword>" --limit <N> -f json
+opencli trip search-activities "<keyword>" --limit <N> -f json
+opencli getyourguide search-activities "<keyword>" --limit <N> -f json
+opencli kkday search-activities "<keyword>" --limit <N> -f json
 ```
 
-Always use `-f json` for structured output you can parse:
+### Get activity payload (title, packages, itinerary, sections, rating)
 
 ```bash
-opencli klook search "Mt Fuji day tour" --limit 5 -f json
+opencli klook get-activity <id> -f json
+opencli trip get-activity <id> -f json
+opencli getyourguide get-activity <id-or-url> -f json
+opencli kkday get-activity <id> -f json
+
+# Trip-specific: inline 7-day min prices
+opencli trip get-activity <id> --compare-dates -f json
 ```
 
-### Get activity detail (itinerary, packages, pricing)
+### Get packages only (narrow projection, lighter payload)
 
 ```bash
-opencli klook detail <activity-id> -f json
-opencli trip detail <activity-id> -f json
-opencli getyourguide detail "<full-url>" -f json
-opencli kkday detail <product-id> -f json
+opencli <platform> get-packages <id> -f json
 ```
 
-For Trip.com, you can compare prices across multiple dates:
+### Get pricing matrix (package/SKU × date, 7 days)
 
 ```bash
-opencli trip detail <activity-id> --compare-dates -f json
+opencli <platform> get-pricing-matrix <id> --days 7 -f json
 ```
 
 ### Cross-platform AI comparison
 
-First check configured POIs:
-
 ```bash
-node dist/cli.js poi list
-```
-
-Run comparison for a POI:
-
-```bash
-node dist/cli.js compare "<POI name>" --date <YYYY-MM-DD> -f json
-```
-
-Run all POIs at once:
-
-```bash
-node dist/cli.js compare --all --date <YYYY-MM-DD> --save -f json
-```
-
-View price history:
-
-```bash
-node dist/cli.js compare-history "<POI name>" --days 7
+node dist/cli.js list-pois
+node dist/cli.js compare-poi "<POI>" --date <YYYY-MM-DD> --save -f json
+node dist/cli.js compare-poi --all --date <YYYY-MM-DD> --save -f json
+node dist/cli.js get-poi-price-history "<POI>" --days 7
 ```
 
 ### Manage POIs
 
 ```bash
-node dist/cli.js poi add "<name>" --keywords "<kw1>,<kw2>" --platforms klook,trip,getyourguide,kkday
-node dist/cli.js poi list
-node dist/cli.js poi remove "<name>"
+node dist/cli.js add-poi "<name>" --keywords "<kw1>,<kw2>" --platforms klook,trip,getyourguide,kkday
+node dist/cli.js list-pois
+node dist/cli.js remove-poi "<name>"
 ```
 
 ## Important Notes
 
 - Klook search uses a public API and is fast (<1s). Other platforms use Browser Bridge and take ~10s each.
 - Always use `-f json` when you need to parse the output programmatically.
-- The `compare` command searches all platforms and calls an LLM to cluster results. It can take 1-3 minutes.
-- Activity IDs come from search results. Klook uses numeric IDs (e.g., 93901). KKday uses product IDs (e.g., 2247). Trip.com uses detail IDs (e.g., 92795279). GetYourGuide uses full URLs.
+- The `compare-poi` command searches all platforms and calls an LLM to cluster results. It can take 1-3 minutes.
+- Activity IDs come from search results. All four platforms use numeric IDs — Klook (e.g., 93901), KKday product IDs (e.g., 2247), Trip.com detail IDs (e.g., 92795279), GetYourGuide `t{N}` trailing IDs (e.g., 12345 from `/city-l234/slug-t12345/`). Adapters' `parseActivityId`/`parseProductId` accept either the bare ID or the full URL.
 - Strip any "Update available" lines from opencli output before parsing JSON.
 
 ## Workflow for User Requests
@@ -87,9 +93,9 @@ When users ask about travel activities or prices:
 
 When users ask you to monitor or track prices:
 
-1. **Add a POI** with relevant keywords
-2. **Run compare** with `--save` to store the baseline
-3. Explain they can run `compare` again later (or via cron) to track changes
+1. **Add a POI** with relevant keywords (`add-poi`)
+2. **Run `compare-poi`** with `--save` to store the baseline
+3. Explain they can run `compare-poi` again later (or via cron) to track changes
 
 ## Tours Pipeline (scheduled routine workflow)
 
@@ -107,56 +113,44 @@ routine should drive.
 
 ### Core commands
 
+Old terse names (`ingest`, `export`, `report`, `review-sku` …) still work as aliases. Full reference: `docs/platform-capabilities.md`.
+
 ```bash
-# Ingest one activity (runs opencli <platform> pricing under the hood)
-node dist/cli.js tours ingest <platform> <activity-id> --poi "<POI>" --days 7
+# Ingest one activity (runs opencli <platform> get-pricing-matrix under the hood)
+node dist/cli.js tours ingest-pricing <platform> <activity-id> --poi "<POI>" --days 7
 
 # Bulk: read all (platform, activity-id) pairs from the planning CSV
-node dist/cli.js tours ingest-from-golden data/golden/pricing-tna-planning.csv \
+node dist/cli.js tours ingest-from-planning-csv data/golden/pricing-tna-planning.csv \
   --platforms klook,trip --days 7
 
 # Ingest from a previously saved JSON snapshot (skips scraping — useful when blocked)
-node dist/cli.js tours ingest-snapshot klook data/snapshots/<file>.json \
+node dist/cli.js tours ingest-from-snapshot klook data/snapshots/<file>.json \
   --poi "Mount Fuji" --url <canonical-url>
 
 # Export DB to CSV matching the planning sheet
-node dist/cli.js tours export
+node dist/cli.js tours export-csv
 
 # Generate HTML coverage/completeness report (writes latest.html)
-node dist/cli.js tours report
+node dist/cli.js tours generate-report
 
 # List activities currently in the DB
-node dist/cli.js tours list --platform klook --poi "Mount Fuji"
+node dist/cli.js tours list-activities --platform klook --poi "Mount Fuji"
 
 # Mark data as reviewed (feedback mechanism)
-node dist/cli.js tours review-sku <sku-id> verified --note "checked on live site"
-node dist/cli.js tours review-activity <activity-id> rejected --note "wrong POI"
+node dist/cli.js tours set-sku-review-status <sku-id> verified --note "checked on live site"
+node dist/cli.js tours set-activity-review-status <activity-id> rejected --note "wrong POI"
 
 # Cross-platform match from a URL (URL-first lookup, LLM-ranked)
-node dist/cli.js tours match-from-url "https://www.klook.com/en-US/activity/151477" \
+node dist/cli.js tours find-cross-platform-match "https://www.klook.com/en-US/activity/151477" \
   --to trip -f json
 ```
 
 ### Routine workflow (what a scheduled Claude Code run should do)
 
-1. **Fetch fresh pricing.** For each (platform, activity-id) target:
-   - `node dist/cli.js tours ingest <platform> <id> --poi "<POI>" --days 7`
-   - If it fails (block, timeout, empty result), retry once. Still failing:
-     use the `browse` skill or agent-browser to capture the page manually,
-     save the SKU rows as JSON matching `PricingRunRaw`, then run
-     `tours ingest-snapshot` instead.
-2. **Export and report.**
-   - `node dist/cli.js tours export` → `data/exports/<today>.csv`
-   - `node dist/cli.js tours report` → `data/reports/<today>.html` + `latest.html`
-3. **Check completeness.** Open the generated JSON summary. If any of
-   `completeness_flags.missing_supplier`, `missing_departure_time`,
-   `unknown_tour_type` is unexpectedly high, investigate and re-ingest the
-   offending activities with agent-browser to fill gaps.
-4. **Flag anomalies.** If an SKU's price moved >30% from the previous
-   observation, auto-flag it: `tours review-sku <id> flagged --note "price jump"`.
-5. **Read prior feedback.** Before re-scraping, query `activities` where
-   `review_status = 'rejected'` and skip them. Where `review_status = 'flagged'`
-   and `review_note` suggests a fix (e.g. "use en-UK locale"), honor the note.
+See the **`opencli-tours-routine`** skill (`.claude/skills/opencli-tours-routine/SKILL.md`)
+for the full step-by-step playbook: pre-flight checks, feedback lookup, ingest,
+export/report, completeness review, anomaly flagging, and run summary. The
+skill is the source of truth — do not duplicate its steps here.
 
 ### Feedback loop
 

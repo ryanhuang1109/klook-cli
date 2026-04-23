@@ -253,7 +253,8 @@ export function buildMultiDateEvaluate(): string {
 
 cli({
   site: 'trip',
-  name: 'detail',
+  name: 'get-activity',
+  aliases: ['detail'],
   description: 'Show Trip.com activity detail with package pricing across dates',
   domain: 'www.trip.com',
   strategy: Strategy.COOKIE,

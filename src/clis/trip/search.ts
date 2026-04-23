@@ -46,7 +46,8 @@ export function buildSearchEvaluate(limit: number): string {
 
 cli({
   site: 'trip',
-  name: 'search',
+  name: 'search-activities',
+  aliases: ['search'],
   description: 'Search Trip.com activities, tickets, and experiences',
   domain: 'www.trip.com',
   strategy: Strategy.COOKIE,

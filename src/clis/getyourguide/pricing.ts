@@ -143,7 +143,8 @@ const READ_VARIANTS_JS = `
 
 cli({
   site: 'getyourguide',
-  name: 'pricing',
+  name: 'get-pricing-matrix',
+  aliases: ['pricing'],
   description: 'Extract per-variant × per-date pricing for the next N days',
   domain: 'www.getyourguide.com',
   strategy: Strategy.COOKIE,

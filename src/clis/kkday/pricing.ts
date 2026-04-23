@@ -178,7 +178,8 @@ const READ_CAL_CELLS_JS = `
 
 cli({
   site: 'kkday',
-  name: 'pricing',
+  name: 'get-pricing-matrix',
+  aliases: ['pricing'],
   description: 'Extract per-package × per-date pricing for the next N days',
   domain: 'www.kkday.com',
   strategy: Strategy.COOKIE,

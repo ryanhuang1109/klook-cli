@@ -398,7 +398,8 @@ export function buildDetailEvaluate(): string {
 
 cli({
   site: 'getyourguide',
-  name: 'detail',
+  name: 'get-activity',
+  aliases: ['detail'],
   description: 'Show GetYourGuide activity detail with pricing and inclusions',
   domain: 'www.getyourguide.com',
   strategy: Strategy.COOKIE,
