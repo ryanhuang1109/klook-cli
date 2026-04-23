@@ -28,16 +28,73 @@ That's it. Everything else is done.
 
 ## What "human-only knowledge" looks like
 
-Examples of things **only you know**, that the code doesn't reveal:
+These are things **only you know** from real debugging — the code doesn't reveal them.
 
-- "Trip's zh-TW locale sometimes redirects to zh-CN Ctrip — pin to en-US"
-- "KKday calendar needs 3-second wait after 'Select' click on cold bridge"
-- "GYG's datepicker closes itself if you click outside the modal too quickly"
-- "When review_count shows 'Coming soon', the activity is actually unavailable"
-- "Price 'TBD' means the SKU exists but isn't bookable this week"
-- "Prices in CNY hint that you accidentally loaded zh-CN — abort"
+**Quirks** = stable facts about the platform (one-liner).
+**Known failure modes** = "when I see X, I do Y" (one-liner per case).
 
-These go into **Quirks** (stable tips) or **Known failure modes** (symptom → response).
+Don't write paragraphs. Copy-paste a bullet and edit it — most of the work is done.
+
+### Quirk templates — Trip (pick what applies, edit, delete the rest)
+
+```md
+- **<Symptom you'd describe to a teammate>**: <one-line detail or fix>.
+```
+
+Starter copy-paste:
+- **Currency drift by geo**: Trip serves whatever currency the Browser Bridge cookie pins → downstream consumers must normalize before cross-platform compare.
+- **Region redirect**: zh-TW locale sometimes redirects to zh-CN Ctrip (different DOM entirely) → pin Browser Bridge cookie to en-US.
+- **Title pollution**: title div occasionally concatenates promotion copy after the real title → if titles look noisy, add a new suffix to the `Promotion` / `Duration:` slice in `detail.ts`.
+- **SKU hydration lag**: if `get-pricing-matrix` returns empty packages[] on first try, the page loaded before SKU tabs rendered → retry once is usually enough.
+- **`.m_ceil` dual-use**: SKU tabs and date cells share this class → the scraper filters on id-format (numeric vs YYYY-MM-DD), don't iterate raw.
+- **`--compare-dates` tradeoff**: cheaper (no per-SKU click) but only gives the minimum-across-SKU per date → don't use when you need per-SKU granularity.
+
+### Quirk templates — GYG
+
+Starter copy-paste:
+- **Language is a variant axis**: GYG exposes language via a dropdown, not a matrix cell → `packages[]` can have more entries than you'd expect; merge by language in `packages.available_languages`.
+- **Datepicker modal close**: clicking outside the modal too fast during pricing scrape closes the picker → the scraper now waits 500ms before each click; if you hit this, increase the wait.
+- **Check-availability → date input swap**: after the first date selection, the CTA button becomes a date input → re-open sequence differs; the scraper handles both, but probes must too.
+- **Single-language tours**: some tours have no language dropdown at all → empty `languages: []` is expected, not a failure.
+- **Currency by cookie**: whatever Bridge cookie pins → normalize before inserting into `skus.price_usd`.
+- **"Top pick" / "Booked N times" badges**: these pollute titles → the scraper strips them, but if a new badge format ships, update the regex in `search.ts`.
+
+### Quirk templates — KKday
+
+Starter copy-paste:
+- **Cold-bridge first request**: returns a skeletal page → retry once typically fixes it; if not, warm the bridge with any known-good request first.
+- **"from" price is minimum**: `get-pricing-matrix` output `price` is the cheapest across sub-SKUs, not per-tier → do not compare directly against Klook adult/child tiers; normalize first.
+- **Package tab ordering**: Admission → Bundle → VIP is the UI order and the scraper preserves it → if downstream dedupes by title alone, same-named packages across tiers can collapse incorrectly.
+- **Locale subpath rewrite**: URLs with `/zh-tw/` are rewritten to `/en/` before scraping → the stored `canonical_url` is always the `/en/` variant.
+- **Booking counter absence**: newer products have no "X+ travelers booked" label → empty `order_count` is expected, not a scraper bug.
+- **Calendar lazy-mount**: calendar renders after "Select" click with a short animation → scraper waits, but aggressive anim changes break it; symptom is "package found, dates empty".
+
+### Known failure mode templates (symptom → response)
+
+```md
+- **<Symptom visible in output or logs>**: <how to respond — flag? retry? escalate?>.
+```
+
+Starter copy-paste (applies to most platforms, edit):
+- **`packages[]` length = 0 but HTTP 200**: scraper ran, page was empty → `tours set-activity-review-status <id> flagged --note "empty packages on <date>"`, do not auto-retry.
+- **Price field contains "TBD" / "Sold out" / empty**: SKU exists but not bookable → store `availability: "unknown"`, don't treat as price-zero.
+- **Review count drops by >50% day-over-day**: likely the adapter is hitting a different locale → abort run, check cookie pin.
+- **Currency mismatch vs previous run**: normalize or flag → do not cross-compare raw `price_local`.
+- **Same `platform_package_id` but different `name`**: platform renamed a package → upsert by `platform_package_id`, update `title`, don't create a duplicate row.
+
+---
+
+## How to write YOUR own (if none above fit)
+
+Good quirk: short, specific, actionable. Bad quirk: generic programming advice.
+
+| ✅ Good | ❌ Bad |
+|---|---|
+| "KKday `/en/` pins USD; `/zh-tw/` pins TWD — never mix in one run" | "Be careful with locales" |
+| "Datepicker closes if outer click within 500ms" | "UI can be fragile" |
+| "Review count 'Coming soon' = unavailable, don't flag as missing" | "Some fields may be empty" |
+
+Aim for: 1 observation → 1 consequence → 1 action. If you can't fit it on one line, it probably isn't a quirk — it's a whole new section.
 
 ---
 
