@@ -83,3 +83,14 @@ When `opencli kkday get-pricing-matrix <id>` fails or returns empty:
 - `src/clis/kkday/probe.ts` / `probe2.ts` — debug-only DOM dumps
 
 After any change: `npm run build`.
+
+## I/O Schema
+
+Canonical reference: **`docs/io-schemas.md`** — input args, output JSON shapes, DB column mappings.
+
+**KKday-specific nuances**:
+- **Booking counter** (`order_count`): KKday is the only platform surfacing "X+ travelers booked"; write into `activities.order_count` after parsing the digits.
+- **"From" prices are minima, not per-SKU**: `get-pricing-matrix` output's `price` is the cheapest across sub-SKUs for that package/date. Do **not** treat this as a single-SKU price when inserting — the `sku` row represents a "package minimum price" not a leaf tier.
+- **Locale-pinned `/en/`**: if a URL comes in with `/zh-tw/`, the adapter rewrites to `/en/` before scraping → the `canonical_url` stored is always the `/en/` variant.
+
+**Writes when called via tours pipeline**: same tables. The package category tiering (Admission / Bundle / VIP) is preserved as part of `packages.title` — do not collapse by name alone, combine with `platform_package_id` for uniqueness.

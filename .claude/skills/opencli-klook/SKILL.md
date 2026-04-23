@@ -71,3 +71,19 @@ Edit these files to change skill-observed behavior:
 - `src/clis/klook/trending.ts` — trending city endpoint
 
 After any change: `npm run build` (the symlink at `~/.opencli/plugins/klook` picks up `dist/` automatically).
+
+## I/O Schema
+
+Canonical reference: **`docs/io-schemas.md`** — full input args, output JSON shapes, and DB column mappings for all 4 commands.
+
+**Klook-specific output fields** (not present on other platforms):
+- `supplier` (activities.supplier) — Klook exposes the fulfillment supplier name on the detail page
+- `trending` command output — rank-ordered city activities (not persisted; feeds `ingest-top-from-search`)
+- `get-pricing-matrix` output is typically the **richest** among 4 platforms because Klook's calendar walks every SKU-date cell
+
+**Writes when called via tours pipeline**:
+- `get-activity` → `activities` row + `packages[]` rows (+ raw_extras_json for images/sections/itinerary)
+- `get-packages` → `packages[]` rows only (parent `activities` row must already exist; combine with prior `get-activity`)
+- `get-pricing-matrix` → upsert `skus` rows + append `sku_observations` for history
+
+When inserting into Supabase (future): fields marked TEXT-holding-JSON in `docs/io-schemas.md` should migrate to `JSONB`; let the normalizer (`src/tours/normalize.ts`) own the parsing.

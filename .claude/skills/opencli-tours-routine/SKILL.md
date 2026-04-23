@@ -76,3 +76,24 @@ Report back to the user:
 - It does not define the canonical schema — that lives in `src/tours/db.ts`.
 - It does not teach platform quirks — those live in `opencli-<platform>` skills.
 - It does not auto-run on a schedule — the user triggers it manually; scheduled routine wiring is a separate decision.
+
+## DB writes
+
+The tours routine writes to **seven tables** — see `docs/io-schemas.md` for the full column-level schema.
+
+| Phase | Tables written |
+|---|---|
+| Step 2 (ingest-pricing / ingest-from-detail) | `activities` (upsert) → `packages` (upsert) → `skus` (upsert) → `sku_observations` (append) |
+| Step 2 failures | `execution_logs` (append) — one row per attempt with strategy / duration / error |
+| Step 2 via `ingest-top-from-search` | `search_runs` (append) with per-platform hit count |
+| `run-daily-routine` | `run_sessions` (one row wrapping the whole run, with status `running` → `finished`) |
+| Step 5 (set-sku-review-status / set-activity-review-status) | `skus.review_status` / `activities.review_status` UPDATE |
+| Step 4 (completeness flags) | stored per-package in `packages.completeness_json` (JSON blob) |
+
+**Supabase migration checklist** (when wiring):
+- Map `AUTOINCREMENT` PKs → `GENERATED ALWAYS AS IDENTITY`
+- Map JSON-as-TEXT columns (`raw_extras_json`, `inclusions`, `exclusions`, `completeness_json`, `available_languages`) → `JSONB`
+- Map ISO-timestamp TEXT columns → `TIMESTAMPTZ`
+- RLS: `service_role` full, `authenticated` read-only on activities/packages/skus
+
+The normalizer (`src/tours/normalize.ts`) owns all numeric parsing (K/M suffixes, currency extraction, date normalization) — **the routine should never inline these**. If a scraper returns data the normalizer rejects, treat it as a completeness flag, not a silent fix.

@@ -83,3 +83,14 @@ If multiple Trip targets fail in the same run, the issue is almost always Browse
 - `src/clis/trip/probe.ts` — debug-only DOM dump
 
 After any change: `npm run build`. Symlink at `~/.opencli/plugins/trip` (if registered) picks up `dist/` automatically; otherwise run via `node dist/cli.js`.
+
+## I/O Schema
+
+Canonical reference: **`docs/io-schemas.md`** — input args, output JSON shapes, DB column mappings.
+
+**Trip-specific nuances**:
+- `get-activity --compare-dates` emits an **additional** field with the 7-day inline "from" price strip — useful when you want date coverage without the full SKU walk
+- `get-pricing-matrix` output's `package_id` is the numeric SKU tab id (distinguishes from date cells that share the `.m_ceil` class)
+- Currency is whatever Trip serves the Browser Bridge cookie → normalize before inserting into `skus.price_usd`
+
+**Writes when called via tours pipeline**: same tables as Klook. `package_id` maps to `packages.platform_package_id`; keep it stable across runs so upserts don't create duplicates.
