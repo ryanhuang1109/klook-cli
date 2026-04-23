@@ -12,6 +12,22 @@ description: Execute and troubleshoot opencli kkday commands for KKday activitie
 - **Domain**: `kkday.com` (primary market zh-TW; `/en/` subpath used by the adapter)
 - **Source**: `src/clis/kkday/` (`search.ts`, `detail.ts`, `pricing.ts` — plus `probe.ts` and `probe2.ts` debug helpers)
 
+---
+
+> ### 👋 For the owner — only 3 things to fill (~30 min)
+>
+> Most of this skill is pre-filled from source code. Your job is to add human-only knowledge:
+>
+> 1. **Change the `Owner:` line above** — replace `TODO — assign a maintainer …` with `你的名字 (you@klook.com)`.
+> 2. **Add 2–3 bullets to `## Quirks`** — things you've personally debugged (cold-bridge warm-up behavior, locale-dependent rendering, booking-counter accuracy, tier / tab edge cases, etc.).
+> 3. **Add 1–2 bullets to `## Known failure modes`** — observed symptoms + the right response (flag / retry / escalate).
+>
+> **Test**: in Claude Code, type `/opencli-kkday 2247` (any KKday product ID). If it invokes this skill and returns valid JSON, your changes are working.
+> **Don't write**: section headings, command examples, I/O schemas, or the Touchpoints list — all already done.
+> **Full briefing**: `docs/owner-briefing.md`.
+
+---
+
 ## Identifiers
 
 - KKday uses **numeric product IDs** (e.g. `2247`).

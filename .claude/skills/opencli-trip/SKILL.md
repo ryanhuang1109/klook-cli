@@ -12,6 +12,22 @@ description: Execute and troubleshoot opencli trip commands for Trip.com (Ctrip 
 - **Domain**: `trip.com` (Ctrip international; the zh-CN sibling is `ctrip.com` but this adapter targets trip.com)
 - **Source**: `src/clis/trip/` (`search.ts`, `detail.ts`, `pricing.ts` — plus `probe.ts` debug helper)
 
+---
+
+> ### 👋 For the owner — only 3 things to fill (~30 min)
+>
+> Most of this skill is pre-filled from source code. Your job is to add human-only knowledge:
+>
+> 1. **Change the `Owner:` line above** — replace `TODO — assign a maintainer …` with `你的名字 (you@klook.com)`.
+> 2. **Add 2–3 bullets to `## Quirks`** — things you've personally debugged that aren't obvious from the code (calendar behavior under load, cookie staleness window, regional redirects you've seen, weird price states like "TBD", etc.).
+> 3. **Add 1–2 bullets to `## Known failure modes`** — observed symptoms + the right response (flag / retry / escalate).
+>
+> **Test**: in Claude Code, type `/opencli-trip 92795279` (or any Trip ID you know). If it invokes this skill and returns valid JSON, your changes are working.
+> **Don't write**: section headings, command examples, I/O schemas, or the Touchpoints list — all already done.
+> **Full briefing**: `docs/owner-briefing.md`.
+
+---
+
 ## Identifiers
 
 - Trip activity IDs are **numeric**, e.g. `92795279`.
