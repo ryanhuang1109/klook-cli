@@ -1,20 +1,24 @@
 ---
 description: Run an opencli getyourguide task — scoped to GetYourGuide only (for skill owners testing their platform)
-argument-hint: [activity-id | full-url | search-keyword]
+argument-hint: [activity-id | full-url | "keyword" | --poi <name>] [--csv | --ingest]
 ---
 
 Invoke the `opencli-getyourguide` skill and operate **only on GetYourGuide** for this turn.
 
 Pre-flight: `opencli doctor` — GYG requires Browser Bridge.
 
-Argument interpretation:
-- If `$ARGUMENTS` matches `t\d+` or is a full `getyourguide.com` URL → treat as GYG activity ID. Ask which sub-command:
-  - `opencli getyourguide get-activity <id-or-url>` — full payload including language options
-  - `opencli getyourguide get-packages <id-or-url>` — just packages[]
-  - `opencli getyourguide get-pricing-matrix <id-or-url> --days 7`
-- If `$ARGUMENTS` is a keyword phrase → `opencli getyourguide search-activities "$ARGUMENTS" --limit 5 -f json`.
-- If empty → load skill, print cheat-sheet, wait.
+**Argument interpretation**:
 
-Note: No `trending` command. GYG treats language as a first-class variant axis — expect more `packages[]` entries than a naïve matrix.
+1. **`--poi <name>`** → `list-pois` → use POI keywords to search.
+2. **`t\d+` pattern or `getyourguide.com` URL** → single-activity mode. Ask which: `get-activity` / `get-packages` / `get-pricing-matrix`.
+3. **Quoted keyword phrase** → `opencli getyourguide search-activities "<phrase>" --limit 5 -f json`.
+4. **Empty** → cheat-sheet.
+
+**Output-format flags**:
+- `--csv` → `-f csv` on final call
+- `--ingest` → `tours ingest-pricing getyourguide <id>` + `tours export-csv`
+- Default → JSON
+
+GYG treats language as a first-class variant axis — expect more `packages[]` entries than a naïve matrix. No `trending` command.
 
 $ARGUMENTS
