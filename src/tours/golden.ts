@@ -21,6 +21,12 @@ export interface GoldenRow {
   lowest_price_url: string;
   price_usd: number | null;
   price_local: string;
+  // Listing-discovery metadata — colleagues append these when they find new activities
+  // via listing-page crawling. All optional; empty string if not provided.
+  listing_url: string;        // the listing page the activity was found on
+  discovered_by: string;      // colleague / team identifier
+  discovered_at: string;      // ISO date (YYYY-MM-DD)
+  theme: string;              // optional sub-vertical / category label
 }
 
 /** Minimal CSV splitter that understands quoted fields with commas / newlines. */
@@ -96,6 +102,12 @@ export function loadGoldenCSV(csvPath: string): GoldenRow[] {
       lowest_price_url: (r[10] || '').trim(),
       price_usd: Number.isFinite(priceUsd as number) ? (priceUsd as number) : null,
       price_local: (r[12] || '').trim(),
+      // Listing-discovery metadata at columns 16–19 (0-indexed: 15–18).
+      // Missing columns → empty string (rows pre-dating this extension still load).
+      listing_url: (r[15] || '').trim(),
+      discovered_by: (r[16] || '').trim(),
+      discovered_at: (r[17] || '').trim(),
+      theme: (r[18] || '').trim(),
     });
   }
   return out;
@@ -106,6 +118,11 @@ export interface ActivityTarget {
   activity_id: string;
   url: string;
   poi: string;
+  // Listing-discovery metadata (all optional). Empty string when missing.
+  listing_url: string;
+  discovered_by: string;
+  discovered_at: string;
+  theme: string;
 }
 
 const URL_ID_PATTERNS: { platform: string; regex: RegExp }[] = [
@@ -116,10 +133,23 @@ const URL_ID_PATTERNS: { platform: string; regex: RegExp }[] = [
   { platform: 'getyourguide', regex: /getyourguide\.com\/.+-t(\d+)/i },
 ];
 
-export function extractActivityTarget(url: string, poi: string): ActivityTarget | null {
+export function extractActivityTarget(
+  url: string,
+  poi: string,
+  meta?: { listing_url?: string; discovered_by?: string; discovered_at?: string; theme?: string },
+): ActivityTarget | null {
   for (const { platform, regex } of URL_ID_PATTERNS) {
     const m = url.match(regex);
-    if (m) return { platform, activity_id: m[1], url, poi };
+    if (m) return {
+      platform,
+      activity_id: m[1],
+      url,
+      poi,
+      listing_url: meta?.listing_url ?? '',
+      discovered_by: meta?.discovered_by ?? '',
+      discovered_at: meta?.discovered_at ?? '',
+      theme: meta?.theme ?? '',
+    };
   }
   return null;
 }
@@ -129,7 +159,12 @@ export function uniqueActivityTargets(rows: GoldenRow[]): ActivityTarget[] {
   const out: ActivityTarget[] = [];
   for (const r of rows) {
     if (!r.lowest_price_url) continue;
-    const target = extractActivityTarget(r.lowest_price_url, r.main_poi);
+    const target = extractActivityTarget(r.lowest_price_url, r.main_poi, {
+      listing_url: r.listing_url,
+      discovered_by: r.discovered_by,
+      discovered_at: r.discovered_at,
+      theme: r.theme,
+    });
     if (!target) continue;
     const key = `${target.platform}:${target.activity_id}`;
     if (seen.has(key)) continue;

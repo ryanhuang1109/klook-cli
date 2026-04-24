@@ -7,26 +7,10 @@ description: Execute and troubleshoot opencli getyourguide commands for GetYourG
 
 <!-- Platform skill metadata — grep-friendly. Keep these 5 fields current. -->
 - **Platform**: `getyourguide`
-- **Owner**: TODO — assign a maintainer (prefilled scaffold by Ryan from source code)
+- **Owner**: klook-cli core team (ryan.huang@klook.com) — scrape logic maintained here; listing-page discovery owned by BD team (see `docs/colleague-handoff.md`)
 - **Strategy**: `BROWSER_BRIDGE` (GYG is SSR, no public API). Verify Browser Bridge with `opencli doctor`.
 - **Domain**: `getyourguide.com`
 - **Source**: `src/clis/getyourguide/` (`search.ts`, `detail.ts`, `pricing.ts` — plus `probe.ts` and `probe2.ts` debug helpers)
-
----
-
-> ### 👋 For the owner — only 3 things to fill (~30 min)
->
-> Most of this skill is pre-filled from source code. Your job is to add human-only knowledge:
->
-> 1. **Change the `Owner:` line above** — replace `TODO — assign a maintainer …` with `你的名字 (you@klook.com)`.
-> 2. **Add 2–3 bullets to `## Quirks`** — things you've personally debugged (datepicker modal behavior, language-axis edge cases, peak-hour scraping instability, known unreliable regions, etc.).
-> 3. **Add 1–2 bullets to `## Known failure modes`** — observed symptoms + the right response (flag / retry / escalate).
->
-> **Test**: in Claude Code, type `/opencli-getyourguide t12345` (any GYG activity ID). If it invokes this skill and returns valid JSON, your changes are working.
-> **Don't write**: section headings, command examples, I/O schemas, or the Touchpoints list — all already done.
-> **Full briefing**: `docs/owner-briefing.md`.
-
----
 
 ## Identifiers
 

@@ -276,7 +276,9 @@ export async function cmdIngestFromGolden(opts: {
 
   if (opts.dryRun) {
     for (const t of toRun) {
-      console.log(`  ${t.platform} ${t.activity_id}  POI=${t.poi}  ${t.url}`);
+      const prov = t.listing_url ? `  ← ${t.listing_url}` : '';
+      const who = t.discovered_by ? ` [by ${t.discovered_by}]` : '';
+      console.log(`  ${t.platform} ${t.activity_id}  POI=${t.poi}  ${t.url}${prov}${who}`);
     }
     return;
   }
@@ -284,7 +286,8 @@ export async function cmdIngestFromGolden(opts: {
   const db = await openDB();
   const results: any[] = [];
   for (const t of toRun) {
-    process.stderr.write(`→ ${t.platform}/${t.activity_id} (${t.poi}) ... `);
+    const prov = t.listing_url ? ` ← ${t.listing_url.slice(0, 40)}…` : '';
+    process.stderr.write(`→ ${t.platform}/${t.activity_id} (${t.poi})${prov} ... `);
     try {
       const r = await ingestPricing(db, {
         platform: t.platform as Platform,
@@ -294,11 +297,17 @@ export async function cmdIngestFromGolden(opts: {
         canonicalUrl: t.url,
       });
       process.stderr.write(`ok (${r.skus_written} SKUs)\n`);
-      results.push(r);
+      results.push({ ...r, listing_url: t.listing_url, discovered_by: t.discovered_by });
     } catch (err) {
       const msg = (err as Error).message;
       process.stderr.write(`FAILED: ${msg.slice(0, 160)}\n`);
-      results.push({ platform: t.platform, activity_id: t.activity_id, error: msg });
+      results.push({
+        platform: t.platform,
+        activity_id: t.activity_id,
+        error: msg,
+        listing_url: t.listing_url,
+        discovered_by: t.discovered_by,
+      });
     }
   }
   db.close();
