@@ -74,10 +74,12 @@ export async function ingestFromListing(
 
   if (!opts.noPricing) {
     for (const a of newOnes) {
-      // The opencli `pricing` command accepts either the bare product id or
-      // the full URL — pass platform_product_id when present (cheaper path),
-      // fall back to the URL otherwise.
-      const idForOpencli = a.platform_product_id ?? a.canonical_url;
+      // Prefer the canonical URL — every adapter accepts full URLs, but
+      // GetYourGuide rejects bare ids (it needs the `/city-lXXX/...-tXXX/`
+      // path to hydrate locale + ranking context). Falling back to the
+      // bare id is fine for the rare case where the listing source omitted
+      // the URL.
+      const idForOpencli = a.canonical_url ?? a.platform_product_id;
       try {
         await ingestPricing(db, {
           platform: listing.platform,

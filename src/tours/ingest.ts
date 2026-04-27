@@ -228,7 +228,10 @@ export function runPricingRaw(
 
 function snapshotPath(dir: string, platform: string, activityId: string): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return path.join(dir, `${platform}-${activityId}-${stamp}.json`);
+  // activityId may be a bare id, a URL, or a slugged URL — strip anything
+  // that would create a subdirectory or otherwise break a flat filename.
+  const safe = activityId.replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 80);
+  return path.join(dir, `${platform}-${safe}-${stamp}.json`);
 }
 
 export async function ingestPricing(
