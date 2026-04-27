@@ -271,8 +271,12 @@ cli({
           // file header comment.
           package_name: meta.title,
           package_id: experienceId,
-          daily_min_price: numeric,
-          daily_min_price_raw: cell.price_raw,
+          // Use the shared PricingRowRaw contract field names (`price` /
+          // `price_raw`) so src/tours/normalize.ts picks these up without
+          // platform-specific branching. Airbnb's "per-person daily min"
+          // semantic note lives in the run-level `_note`, not the field name.
+          price: numeric,
+          price_raw: cell.price_raw,
           package_base_price: '',
           // Currency is whatever the Browser Bridge cookie pinned. We extract
           // the symbol ($, €, ¥, £) from the price string and pass it through;
@@ -291,11 +295,11 @@ cli({
       url: meta.url || url,
       title: meta.title,
       days_requested: days,
-      days_captured: allRows.filter(r => r.daily_min_price).length,
+      days_captured: allRows.filter(r => r.price).length,
       packages_found: 1,
       _note:
         'Airbnb experiences are priced per-person. One synthesized package per experience; ' +
-        'time-of-day NOT modeled — daily_min_price is the lowest visible price across slots that day. ' +
+        'time-of-day NOT modeled — `price` is the lowest visible price across slots that day. ' +
         'Empty price means the experience does not surface inline daily prices on the calendar; ' +
         'click-through fallback not yet implemented.',
       rows: allRows,

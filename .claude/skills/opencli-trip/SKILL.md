@@ -75,7 +75,15 @@ If multiple Trip targets fail in the same run, the issue is almost always Browse
 - **Empty SKU list**: Trip occasionally lazy-renders the SKU tab row if the page loaded while scrolled past it. The scraper scrolls to top before extracting — if you still get empty, check whether Trip redesigned `.sku_tab_ceil`.
 - **Date cell "TBD"**: Some SKUs don't have availability for all 7 days; the scraper returns empty-string price rather than dropping the row. Downstream consumers should treat empty price as "unknown", not "zero".
 - **Region redirect**: Requests from a non-en locale sometimes redirect to zh-CN Ctrip (DOM differs completely). Pin Browser Bridge to an en-US cookie.
-- **`No SKU tabs found` on single-package products** *(open, observed 2026-04-27)*: When a product has only one bookable package, Trip doesn't render the `.sku_tab_ceil` row at all — the scraper sees zero `.m_ceil` SKU candidates and bails with `code: UNKNOWN, message: "No SKU tabs found on Trip.com page. Page structure may have changed or product has only one [package]"`. Confirmed reproducible on Mt Fuji products `105146444` and `103219360` (both single-package). Fix: in `src/clis/trip/pricing.ts`, when no SKU tabs are detected, fall back to scraping the visible 7-day price strip directly and synthesize one package row (mirroring how `airbnb/pricing.ts` handles single-package experiences). Don't treat the empty tab list as a failure — it's a legitimate single-SKU product shape.
+- **No `.sku_tab_ceil` row — two distinct UI variants behind one symptom** *(partial fix shipped 2026-04-27)*: Initial diagnosis was "single-package products don't render the tab row." That's true for genuinely single-package listings (fallback shipped: when `LIST_SKUS_JS` returns 0 tabs, synthesize one synthetic SKU keyed off `activityId` and read whatever date cells are visible). But probing Mt Fuji `105146444` revealed a **second variant**: a multi-package product that uses a **vertical package list** instead of horizontal tabs. Probe excerpt:
+  ```
+  packages-vertical_package_wrapper_outer__OQPH4 contains N
+  packages-vertical_package_item_new__c5XR_ rows, each with
+  inline "FromUS$109.77" prices. The default date strip shows only
+  3 hint dates (e.g. May 11/12/13) — clicking a package opens its
+  own calendar.
+  ```
+  The current single-package fallback **does not** correctly cover this layout — it produces 0 rows because (a) it loses the multi-package fan-out and (b) the visible 3-day hint strip rarely overlaps the user's target days. Proper fix (separate work): detect `packages-vertical_package_wrapper` presence, iterate `packages-vertical_package_item_new__` items to extract titles + "From $X" prices, then for each package open its calendar widget and read true per-date pricing. Half-day of adapter work; mirrors the pattern used by Klook's per-package detail flow rather than the tab-click pattern Trip's other layout uses.
 
 ## Touchpoints
 

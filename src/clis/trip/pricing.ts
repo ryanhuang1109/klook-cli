@@ -180,10 +180,16 @@ cli({
     `);
     await page.wait(1500);
 
-    const skus = await page.evaluate(LIST_SKUS_JS) as any[];
-    if (!Array.isArray(skus) || skus.length === 0) {
-      throw new Error('No SKU tabs found on Trip.com page. Page structure may have changed or product has only one default SKU.');
-    }
+    const detectedSkus = await page.evaluate(LIST_SKUS_JS) as any[];
+    // Single-package products (e.g. Mt Fuji 105146444, 103219360) don't render
+    // the .sku_tab_ceil row at all — there's nothing to switch between. The
+    // 7-day price strip is already visible on initial load. Detect that case
+    // and synthesize one SKU keyed off the activity itself, mirroring how
+    // airbnb/pricing handles its one-package-per-experience model.
+    const isSinglePackage = !Array.isArray(detectedSkus) || detectedSkus.length === 0;
+    const skus = isSinglePackage
+      ? [{ sku_id: activityId, title: meta?.title || 'Standard', testid: '' }]
+      : detectedSkus;
 
     const targetDates = new Set(buildTargetDates(days));
     const checkTimestamp = new Date().toISOString();
@@ -191,13 +197,15 @@ cli({
     const errors: { sku_id?: string; date?: string; reason: string }[] = [];
 
     for (const sku of skus) {
-      // Click SKU tab
-      const click = await page.evaluate(buildClickSkuJs(sku.sku_id)) as any;
-      if (!click?.ok) {
-        errors.push({ sku_id: sku.sku_id, reason: `sku-click-failed: ${click?.reason}` });
-        continue;
+      if (!isSinglePackage) {
+        // Click SKU tab to swap the visible price strip into this SKU's row.
+        const click = await page.evaluate(buildClickSkuJs(sku.sku_id)) as any;
+        if (!click?.ok) {
+          errors.push({ sku_id: sku.sku_id, reason: `sku-click-failed: ${click?.reason}` });
+          continue;
+        }
+        await page.wait(2500);
       }
-      await page.wait(2500);
 
       // Read all visible date cells with their prices
       const dateCells = await page.evaluate(READ_DATES_JS) as any[];
@@ -239,6 +247,7 @@ cli({
       days_requested: days,
       days_captured: targetDates.size - (errors.filter(e => e.reason === 'date-not-in-visible-row').length / Math.max(skus.length, 1)),
       skus_found: skus.length,
+      single_package: isSinglePackage,
       rows: allRows,
     };
     if (errors.length > 0) {
