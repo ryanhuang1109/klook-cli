@@ -23,7 +23,7 @@ import { matchFromUrl } from './match.js';
 import type { Platform, ReviewStatus } from './types.js';
 import { loadEnv } from './env.js';
 
-const VALID_PLATFORMS: Platform[] = ['klook', 'trip', 'kkday', 'getyourguide'];
+const VALID_PLATFORMS: Platform[] = ['klook', 'trip', 'kkday', 'getyourguide', 'airbnb'];
 const VALID_REVIEW: ReviewStatus[] = ['unverified', 'verified', 'flagged', 'rejected'];
 
 function dateStamp(): string {

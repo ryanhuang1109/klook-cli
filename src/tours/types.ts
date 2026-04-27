@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 
-export const PlatformEnum = z.enum(['klook', 'trip', 'kkday', 'getyourguide']);
+export const PlatformEnum = z.enum(['klook', 'trip', 'kkday', 'getyourguide', 'airbnb']);
 export type Platform = z.infer<typeof PlatformEnum>;
 
 export const TourTypeEnum = z.enum(['Join', 'Private', 'Unknown']);

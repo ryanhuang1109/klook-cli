@@ -140,9 +140,17 @@ export function buildCoverageReport(
   filters: { poi?: string; platform?: string } = {},
 ): CoverageReportRow[] {
   const runs = db.listCoverageRuns(filters);
-  const activities = db.listActivities(filters);
+  // For activity lookups we ignore the poi filter (do it ourselves below) so
+  // that case-insensitive matching works even when the caller filters by a
+  // specific casing.
+  const activities = db.listActivities({ platform: filters.platform });
 
-  const groupKey = (poi: string, platform: string) => `${poi}::${platform}`;
+  // POI casing is not yet canonicalised at write time — `activities.poi` is
+  // historically lowercase ('mt fuji') while listing inputs may use display
+  // casing ('Mt Fuji'). Normalise here so the join doesn't silently produce
+  // unique=0 when both sides clearly refer to the same POI.
+  const groupKey = (poi: string, platform: string) =>
+    `${poi.trim().toLowerCase()}::${platform}`;
 
   const byGroup = new Map<
     string,
