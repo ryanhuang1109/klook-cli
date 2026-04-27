@@ -50,25 +50,130 @@ function buildTargetDates(days: number): { iso: string; year: number; month: num
  *   - Initial render: button labeled "Check availability" or similar
  *   - After first selection: a date input that re-opens the picker on click
  */
-const OPEN_PICKER_JS = `
+/**
+ * Click Airbnb's "Show dates" CTA in the experience booking sidebar to open
+ * the time-slot modal. Locale-blind via data-testid (set by Airbnb engineers,
+ * not localized): `ExperiencesBookItController-sidebar-button`.
+ *
+ * Inspected DOM 2026-04-27 (zh-TW + en sessions): the modal that opens is
+ * the source of truth — it contains date headings + time-slot cards with
+ * inline prices and availability. The deeper calendar grid is a secondary
+ * navigation UI we do not need.
+ */
+const OPEN_BOOKING_MODAL_JS = `
   (async () => {
     const delay = (ms) => new Promise(r => setTimeout(r, ms));
-    // Locale-aware: text labels Airbnb uses across en / zh-TW / zh-CN / ja / ko.
-    // Anchored to whole-button text so we don't accidentally click an FAQ link.
-    const PICKER_LABEL_RE = /^(check availability|select date|add date|choose date|查詢空房|選擇日期|加入日期|選日期|检查可用情况|选择日期|添加日期|空き状況を確認|日付を選択|日付を追加|날짜 선택|예약 가능 여부 확인)$/i;
-    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
-    const picker = buttons.find((b) => {
-      const t = (b.textContent || '').trim();
-      return PICKER_LABEL_RE.test(t);
-    })
-      // Structural fallbacks (locale-independent) — testid is developer-set,
-      // aria-label may carry the localized "date/日期/日付/날짜" word.
-      || document.querySelector('[data-testid*="datepicker"], [data-testid*="calendar"]')
-      || document.querySelector('[aria-label*="date" i], [aria-label*="日期"], [aria-label*="日付"], [aria-label*="날짜"]');
-    if (!picker) return { ok: false, reason: 'no-picker-trigger' };
-    picker.click();
-    await delay(800);
-    return { ok: true };
+    const btn = document.querySelector('[data-testid="ExperiencesBookItController-sidebar-button"]')
+      || document.querySelector('[data-testid*="BookItController-sidebar"]')
+      || document.querySelector('[data-testid*="show-dates"]');
+    if (!btn) return { ok: false, reason: 'no-show-dates-button' };
+    // Track dialog set before vs after click — Airbnb pages already have
+    // small popovers (cancellation policy etc.) tagged role="dialog", and a
+    // naive querySelector after click would grab the wrong one.
+    const beforeIds = new Set(
+      Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'))
+        .map((d) => d.getAttribute('id') || d.outerHTML.slice(0, 60))
+    );
+    btn.click();
+    await delay(2000);
+    const after = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'));
+    const opened = after.filter((d) => !beforeIds.has(d.getAttribute('id') || d.outerHTML.slice(0, 60)));
+    if (opened.length === 0) {
+      return { ok: false, reason: 'no-new-modal-after-click', dialogCountBefore: beforeIds.size, dialogCountAfter: after.length };
+    }
+    return { ok: true, openedCount: opened.length };
+  })()
+`;
+
+/**
+ * Parse the open booking modal into structured time-slot rows.
+ *
+ * The modal innerText preserves visual hierarchy via newlines:
+ *
+ *   Tomorrow, 28 April          ← date heading
+ *   12:00 – 2:00 pm             ← time slot
+ *   $105 SGD / guest            ← price
+ *   1 spot left                 ← availability
+ *   3:30 – 5:30 pm              ← next time slot under same date
+ *   Sold out                    ← sold-out variant skips price
+ *
+ * State machine: walk lines, update curDate on heading match, push slot on
+ * time-range match, scan next 1-3 lines for price + availability. Locale-aware
+ * for date headings (en + CJK numeric "4月28日") and sold-out markers.
+ */
+const READ_TIME_SLOTS_JS = `
+  (() => {
+    // Pick the most content-rich dialog — defensive against pre-existing
+    // popovers (cancellation, share, etc.) also tagged role="dialog".
+    const candidates = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'));
+    if (candidates.length === 0) return { ok: false, reason: 'no-modal' };
+    const modal = candidates.reduce((best, c) => {
+      const t = (c.innerText || '').length;
+      return !best || t > best._textLen ? Object.assign(c, { _textLen: t }) : best;
+    }, null);
+    if (!modal || !modal._textLen) return { ok: false, reason: 'all-modals-empty', candidateCount: candidates.length };
+    const text = modal.innerText || '';
+    const lines = text.split('\\n').map(s => s.trim()).filter(Boolean);
+
+    const EN_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+    const slots = [];
+    let curMonth = 0, curDay = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // English date heading — "28 April" / "Tomorrow, 28 April" / "Wednesday, 29 April"
+      let m = line.match(/(\\d{1,2})\\s+([A-Za-z]+)/);
+      if (m) {
+        const idx = EN_MONTHS.indexOf(m[2].toLowerCase());
+        if (idx >= 0) {
+          curDay = parseInt(m[1], 10);
+          curMonth = idx + 1;
+          continue;
+        }
+      }
+      // CJK heading — "4月28日" / "4 月 28 日" / "4월 28일"
+      m = line.match(/(\\d{1,2})\\s*[月월]\\s*(\\d{1,2})\\s*[日일]/);
+      if (m) {
+        curMonth = parseInt(m[1], 10);
+        curDay = parseInt(m[2], 10);
+        continue;
+      }
+
+      // Time slot — "12:00 – 2:00 pm" / "3:30 – 5:30 pm" / "9:00 - 11:00"
+      const tm = line.match(/(\\d{1,2}:\\d{2})\\s*(?:[ap]m)?\\s*[–\\-—~]\\s*(\\d{1,2}:\\d{2})\\s*([ap]m)?/i);
+      if (tm && curMonth && curDay) {
+        let price = '', currency = '', priceRaw = '';
+        let availability = 'Available';
+        for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+          const next = lines[j];
+          if (/sold\\s*out|售完|滿員|満員|매진|予約不可/i.test(next)) {
+            availability = 'Sold out';
+          } else if (/spot|位|席|자리/i.test(next) && !/sold/i.test(next)) {
+            availability = next;
+          }
+          // Price line: "$105 SGD" / "US$105" / "¥10,500" / "NT$3,000"
+          if (!price) {
+            const pm = next.match(/([\\$€£¥]|[A-Z]{2,3}\\$?)\\s*([\\d,]+(?:\\.\\d+)?)\\s*([A-Z]{2,3})?/);
+            if (pm) {
+              price = pm[2].replace(/,/g, '');
+              currency = (pm[3] || pm[1] || '').trim();
+              priceRaw = next;
+            }
+          }
+          // Stop scanning if we hit the next time slot line
+          if (j > i + 1 && /\\d{1,2}:\\d{2}\\s*[–\\-—~]/.test(next)) break;
+        }
+        slots.push({
+          month: curMonth, day: curDay,
+          time: tm[0],
+          price, currency, priceRaw,
+          availability,
+        });
+      }
+    }
+    return { ok: true, slots, lineCount: lines.length, sampleLines: lines.slice(0, 25) };
   })()
 `;
 
@@ -234,65 +339,60 @@ cli({
       );
     }
 
-    // Open the date picker
-    const open = await page.evaluate(OPEN_PICKER_JS) as any;
+    // Open the booking-modal flow (NOT the calendar — see header comment on
+    // OPEN_BOOKING_MODAL_JS for the reasoning).
+    const open = await page.evaluate(OPEN_BOOKING_MODAL_JS) as any;
     if (!open?.ok) {
-      // Some experience pages already render an inline calendar in the booking
-      // sidebar without needing a click — try to read straight away.
-    } else {
-      await page.wait(1500);
+      throw new Error(
+        `Could not open Airbnb booking modal: ${open?.reason || 'unknown'}. ` +
+        `Page may need login, may be a bot challenge, or Airbnb may have changed the data-testid.`,
+      );
+    }
+    await page.wait(1500);
+
+    const read = await page.evaluate(READ_TIME_SLOTS_JS) as any;
+    if (!read?.ok) {
+      throw new Error(`Could not read booking modal: ${read?.reason || 'unknown'}`);
+    }
+    const rawSlots: Array<{
+      month: number; day: number; time: string;
+      price: string; currency: string; priceRaw: string;
+      availability: string;
+    }> = read.slots || [];
+
+    // Year inference: airbnb modal omits year. If slot month >= today's month,
+    // assume current year; otherwise rolled into next year.
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1;
+    const inferYear = (m: number) => (m >= curMonth ? curYear : curYear + 1);
+
+    // Group slots by ISO date and pick the cheapest available slot per date.
+    // Matches the "1 SKU per date" model: when an experience runs multiple
+    // time slots, we report the daily min just like Klook/Trip do for their
+    // "From $X" daily price.
+    const slotsByDate = new Map<string, typeof rawSlots>();
+    for (const s of rawSlots) {
+      const iso = `${inferYear(s.month)}-${String(s.month).padStart(2, '0')}-${String(s.day).padStart(2, '0')}`;
+      if (!slotsByDate.has(iso)) slotsByDate.set(iso, []);
+      slotsByDate.get(iso)!.push(s);
     }
 
     const targets = buildTargetDates(days);
-    const targetsByMonth = new Map<string, typeof targets>();
-    for (const t of targets) {
-      const key = `${t.year}-${t.month}`;
-      if (!targetsByMonth.has(key)) targetsByMonth.set(key, []);
-      targetsByMonth.get(key)!.push(t);
-    }
-
     const checkTimestamp = new Date().toISOString();
     const allRows: any[] = [];
     const errors: { date?: string; reason: string }[] = [];
 
-    for (const [monthKey, monthTargets] of targetsByMonth.entries()) {
-      const [y, m] = monthKey.split('-').map(Number);
-
-      const nav = await page.evaluate(buildCalNavigateJs(y, m)) as any;
-      if (!nav?.ok) {
-        const diag = nav?.headerSample || nav?.cellSample
-          ? ` headers=${JSON.stringify(nav.headerSample || []).slice(0, 200)} cells=${JSON.stringify(nav.cellSample || []).slice(0, 200)}`
-          : '';
-        for (const t of monthTargets) {
-          errors.push({ date: t.iso, reason: `cal-nav-failed: ${nav?.reason}${diag}` });
-        }
+    for (const t of targets) {
+      const daySlots = slotsByDate.get(t.iso) || [];
+      if (daySlots.length === 0) {
+        errors.push({ date: t.iso, reason: 'date-not-in-modal' });
         continue;
       }
-      await page.wait(700);
-
-      const read = await page.evaluate(READ_CAL_CELLS_JS) as any;
-      if (!read?.ok || !Array.isArray(read.cells) || read.cells.length === 0) {
-        for (const t of monthTargets) {
-          errors.push({ date: t.iso, reason: `cal-read-failed: ${read?.reason || 'no-cells'}` });
-        }
-        continue;
-      }
-
-      // Build (year-month-day) → cell map
-      const cellMap = new Map<string, any>();
-      for (const c of read.cells) {
-        cellMap.set(`${c.year}-${c.month}-${c.day}`, c);
-      }
-
-      for (const t of monthTargets) {
-        const cell = cellMap.get(`${t.year}-${t.month}-${t.day}`);
-        if (!cell) {
-          errors.push({ date: t.iso, reason: 'day-not-in-cal' });
-          continue;
-        }
-        // Extract numeric price (no currency symbol) for downstream normalization.
-        const numericMatch = cell.price.match(/([\d,]+(?:\.\d+)?)/);
-        const numeric = numericMatch ? numericMatch[1].replace(/,/g, '') : '';
+      const priced = daySlots.filter((s) => s.price && s.availability !== 'Sold out');
+      if (priced.length === 0) {
+        // All slots that day are sold out — record an unavailable row so the
+        // ledger has continuity, rather than appearing as missing data.
         allRows.push({
           ota: 'airbnb',
           activity_id: experienceId,
@@ -301,26 +401,38 @@ cli({
           date: t.iso,
           check_date_time_gmt8: checkTimestamp,
           group_title: '',
-          // One synthesized package per experience — see SKU model decision in
-          // file header comment.
           package_name: meta.title,
           package_id: experienceId,
-          // Use the shared PricingRowRaw contract field names (`price` /
-          // `price_raw`) so src/tours/normalize.ts picks these up without
-          // platform-specific branching. Airbnb's "per-person daily min"
-          // semantic note lives in the run-level `_note`, not the field name.
-          price: numeric,
-          price_raw: cell.price_raw,
+          price: '',
+          price_raw: daySlots.map((s) => s.time).join('; '),
           package_base_price: '',
-          // Currency is whatever the Browser Bridge cookie pinned. We extract
-          // the symbol ($, €, ¥, £) from the price string and pass it through;
-          // the normalizer maps it to ISO.
-          currency: cell.price.match(/[\$€£¥]/)?.[0] || '',
+          currency: '',
           original_price: '',
-          availability: cell.unavailable ? 'Not available' : (cell.price ? 'Available' : 'Unknown'),
-          notes_per_person: 'price is per person',
+          availability: 'Sold out',
+          notes_per_person: 'price is per person; all time slots sold out for this date',
         });
+        continue;
       }
+      priced.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+      const cheapest = priced[0];
+      allRows.push({
+        ota: 'airbnb',
+        activity_id: experienceId,
+        activity_title: meta.title,
+        activity_url: meta.url || url,
+        date: t.iso,
+        check_date_time_gmt8: checkTimestamp,
+        group_title: '',
+        package_name: meta.title,
+        package_id: experienceId,
+        price: cheapest.price,
+        price_raw: `${cheapest.time} ${cheapest.priceRaw}`.trim(),
+        package_base_price: '',
+        currency: cheapest.currency,
+        original_price: '',
+        availability: cheapest.availability,
+        notes_per_person: 'price is per person; cheapest available time slot per date',
+      });
     }
 
     const result: any = {
@@ -338,6 +450,16 @@ cli({
         'click-through fallback not yet implemented.',
       rows: allRows,
     };
+    // Diagnostic dump: when no rows captured, expose what the modal parser saw
+    // so the next debug session doesn't need extra instrumentation.
+    if (allRows.length === 0) {
+      result._diag = {
+        slot_count: rawSlots.length,
+        slot_sample: rawSlots.slice(0, 5),
+        modal_line_count: read.lineCount,
+        modal_sample_lines: read.sampleLines,
+      };
+    }
     if (errors.length > 0) {
       result.errors = errors;
       result._warning = 'Some captures failed — see errors[]';
