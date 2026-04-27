@@ -31,7 +31,7 @@ Validated 2026-04-27 against two experiences:
 | Currency | ⚠️ Browser Bridge cookie-pinned — see below |
 
 **Known v0.2 gaps** to iterate on:
-- **Pricing not implemented**: Airbnb prices per-person × per-time-slot, which doesn't map cleanly onto our `package × date` SKU shape. Decide the shape before writing `pricing.ts`.
+- **Pricing scaffold needs live validation**: `pricing.ts` v0.1 written but not live-tested against the real DOM (Browser Bridge offline at scaffold time). First run will likely need selector tuning around the calendar / date picker.
 - **Some experiences omit the city/category line entirely** (multi-location tours, very old listings) — `city`/`category` will be empty, which is correct behavior, not a regex bug.
 
 ## Currency: Browser Bridge cookie pin
@@ -70,7 +70,14 @@ opencli airbnb get-activity <id-or-url> -f json
 - **Cancellation policy** is rendered as an explicit `h2` on Airbnb (cleaner than KKday/Trip), so the section walker + body-text fallback should both succeed.
 
 ### `pricing`
-**Not yet implemented.** Airbnb experiences are priced per-person × per-time-slot, which doesn't map cleanly onto our existing `package × date` SKU shape. For now use `node dist/cli.js tours ingest-from-detail airbnb <id>` once that path is wired up, or capture pricing manually via the `browse` skill.
+```bash
+opencli airbnb get-pricing-matrix <id-or-url> --days 7 -f json
+```
+**SKU model decision (2026-04-27)**: one SKU per `(experience, date)`, one synthesized package per experience, prices in per-person Airbnb-native units, time-of-day NOT modeled. The output `daily_min_price` is the lowest visible per-person price across time-slots that day. Documented in detail at the top of `src/clis/airbnb/pricing.ts`.
+
+v0.1 reads inline calendar prices (the per-day "$35 / person" labels on each date cell). Experiences that don't surface inline daily prices return `Unknown` for those dates — clicking each cell to read time-slot prices is doable but click-heavy and risks tripping bot detection. Iterate when we observe real failure rates.
+
+**Live verification pending** — code compiled and registered, but Browser Bridge was offline at scaffold time so selector-level correctness is unverified. First real run on a known-cancellable experience (e.g. 232900 Kyoto Kimono) should populate `rows[]` with non-empty `daily_min_price` values; if not, the inline-price selector likely needs adjustment.
 
 ### `trending`
 Not supported on Airbnb. Do not offer this command.
@@ -119,7 +126,8 @@ Canonical reference: **`docs/io-schemas.md`** — full input args, output JSON s
 **Airbnb-specific nuances**:
 - **`supplier` = host name**: parsed from "Hosted by <Name>" body text, not a separate operator label like Klook.
 - **`order_count` is empty**: Airbnb does not surface a "X+ booked" counter on experience pages. Don't expect this column to populate from this platform.
-- **`packages[]` typically has 1 entry** (the experience itself). When refined, "Private experience" / "Group experience" become variant axes — store under `option_dimensions` rather than fanning into duplicate `packages` rows.
+- **`packages[]` typically has 1 entry** (the experience itself). "Private experience" / "Group experience" / language are variant axes stored under `option_dimensions` rather than fanned into duplicate `packages` rows. **This is the SKU model decision** (2026-04-27): cross-platform SKU = `(package, date)` and Airbnb has one synthesized package, so the per-platform SKU count for Airbnb is exactly `days_requested` per experience.
+- **`daily_min_price` is per-person**: Airbnb's native unit. Cross-platform compare must normalize on the consumer side if any other platform reports per-group prices. Klook/Trip/GYG/KKday for daily tours are also per-person, so no normalization is needed today.
 - **`cancellation_policy` (cross-platform field, Airbnb-specific extraction path)**: cleanly captured from the explicit "Cancellation policy" h2. Output is typically a single sentence describing the refund window (e.g. "Free cancellation up to 24 hours before the experience starts").
 
 **Writes when called via tours pipeline**:
