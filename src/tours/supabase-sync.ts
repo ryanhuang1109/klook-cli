@@ -99,6 +99,7 @@ export async function syncToSupabase(
     succeeded: e.succeeded === 1,
   }));
   const searchRuns = dump.searchRuns;
+  const coverageRuns = dump.coverageRuns;
 
   const counts: Record<string, number> = {
     activities: activities.length,
@@ -108,6 +109,7 @@ export async function syncToSupabase(
     run_sessions: sessions.length,
     execution_logs: executions.length,
     search_runs: searchRuns.length,
+    coverage_runs: coverageRuns.length,
   };
 
   if (opts.dryRun) {
@@ -123,6 +125,7 @@ export async function syncToSupabase(
   await upsertChunked(client, 'run_sessions', sessions, 'id');
   await upsertChunked(client, 'execution_logs', executions, 'id');
   await upsertChunked(client, 'search_runs', searchRuns, 'id');
+  await upsertChunked(client, 'coverage_runs', coverageRuns, 'id');
   // Append-only natural-key dedupe — re-running sync won't double-count history.
   await upsertChunked(
     client,
@@ -155,6 +158,7 @@ export async function verifySupabaseSync(db: ToursDB): Promise<{
     ['run_sessions', dump.sessions.length],
     ['execution_logs', dump.executions.length],
     ['search_runs', dump.searchRuns.length],
+    ['coverage_runs', dump.coverageRuns.length],
   ];
   const out: { table: string; sqlite: number; supabase: number | null; ok: boolean }[] = [];
   for (const [table, sqlite] of expected) {

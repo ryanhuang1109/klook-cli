@@ -486,6 +486,46 @@ toursCmd
   });
 
 toursCmd
+  .command('ingest-listing')
+  .description('Ingest a Listing JSON (per-POI per-platform filtered slice) and record coverage')
+  .requiredOption('--file <path>', 'Path to a Listing JSON file (see src/tours/listing.ts for schema)')
+  .option('--no-pricing', 'Only dedupe + log coverage; skip pricing/detail fetch for new IDs')
+  .option('--days <n>', 'Days of pricing matrix per new activity', '7')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .action(async (opts: { file: string; noPricing?: boolean; days?: string; pricing?: boolean; format?: string }) => {
+    const { cmdIngestListing } = await import('./tours/commands.js');
+    try {
+      // commander turns --no-pricing into opts.pricing === false
+      const noPricing = opts.pricing === false;
+      await cmdIngestListing({
+        file: opts.file,
+        noPricing,
+        days: opts.days ? parseInt(opts.days) : undefined,
+        format: opts.format,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('coverage-report')
+  .description('Saturation summary per (POI, platform) — cumulative_unique vs reported total')
+  .option('--poi <name>', 'Filter to a single POI')
+  .option('--platform <p>', 'Filter to a single platform')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .action(async (opts: { poi?: string; platform?: string; format?: string }) => {
+    const { cmdCoverageReport } = await import('./tours/commands.js');
+    try {
+      await cmdCoverageReport({ poi: opts.poi, platform: opts.platform, format: opts.format });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
   .command('sync-to-supabase')
   .description('Mirror the local tours DB to the Supabase Postgres project')
   .option('--since <iso>', 'Only sync time-based rows newer than this ISO timestamp')

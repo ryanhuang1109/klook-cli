@@ -49,6 +49,9 @@ export interface ToursDB {
   listExecutionsForSession(sessionId: string): ExecutionLog[];
   listRecentExecutions(opts?: { sinceHoursAgo?: number; limit?: number }): ExecutionLog[];
 
+  logCoverageRun(run: CoverageRunLog): void;
+  listCoverageRuns(opts?: { poi?: string; platform?: string }): CoverageRunRow[];
+
   /**
    * Raw dump for the Supabase mirror. Returns SQLite-shape rows (booleans as
    * 0/1, array fields as JSON strings) — the sync layer is responsible for
@@ -69,6 +72,7 @@ export interface SyncDump {
   sessions: any[];
   executions: any[];
   searchRuns: any[];
+  coverageRuns: any[];
 }
 
 export interface SearchRunLog {
@@ -80,6 +84,21 @@ export interface SearchRunLog {
   succeeded: number;
   failed: number;
   run_at?: string;
+}
+
+export interface CoverageRunLog {
+  poi: string;
+  platform: string;
+  filter_signature: string;
+  total_reported: number | null;
+  fetched: number;
+  new_unique: number;
+  run_at?: string;
+}
+
+export interface CoverageRunRow extends CoverageRunLog {
+  id: number;
+  run_at: string;
 }
 
 export interface SessionStart {
@@ -297,6 +316,18 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
       FOREIGN KEY(sku_id) REFERENCES skus(id)
     );
     CREATE INDEX IF NOT EXISTS idx_obs_sku ON sku_observations(sku_id, checked_at);
+
+    CREATE TABLE IF NOT EXISTS coverage_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      poi TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      filter_signature TEXT NOT NULL,
+      total_reported INTEGER,
+      fetched INTEGER NOT NULL,
+      new_unique INTEGER NOT NULL,
+      run_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_coverage_poi ON coverage_runs(poi, platform, run_at DESC);
   `);
 
   // Lightweight column migrations for DBs created before a column existed.
@@ -602,6 +633,32 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
       persist();
     },
 
+    logCoverageRun(run) {
+      db.run(
+        `INSERT INTO coverage_runs (poi, platform, filter_signature, total_reported, fetched, new_unique)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [run.poi, run.platform, run.filter_signature, run.total_reported, run.fetched, run.new_unique],
+      );
+      persist();
+    },
+
+    listCoverageRuns(opts = {}) {
+      const where: string[] = [];
+      const params: unknown[] = [];
+      if (opts.poi) {
+        where.push('poi = ?');
+        params.push(opts.poi);
+      }
+      if (opts.platform) {
+        where.push('platform = ?');
+        params.push(opts.platform);
+      }
+      const sql = `SELECT id, poi, platform, filter_signature, total_reported, fetched, new_unique, run_at
+                   FROM coverage_runs ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+                   ORDER BY run_at DESC, id DESC`;
+      return all<CoverageRunRow>(sql, params);
+    },
+
     dumpForSync(opts = {}) {
       const since = opts.since ?? null;
       const activities = all<any>(`SELECT * FROM activities`);
@@ -630,7 +687,17 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
             `SELECT id, platform, keyword, poi, total_found, ingested, succeeded, failed, run_at
              FROM search_runs ORDER BY id`,
           );
-      return { activities, packages, skus, observations, sessions, executions, searchRuns };
+      const coverageRuns = since
+        ? all<any>(
+            `SELECT id, poi, platform, filter_signature, total_reported, fetched, new_unique, run_at
+             FROM coverage_runs WHERE run_at >= ? ORDER BY id`,
+            [since],
+          )
+        : all<any>(
+            `SELECT id, poi, platform, filter_signature, total_reported, fetched, new_unique, run_at
+             FROM coverage_runs ORDER BY id`,
+          );
+      return { activities, packages, skus, observations, sessions, executions, searchRuns, coverageRuns };
     },
 
     close() {

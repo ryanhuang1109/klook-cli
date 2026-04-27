@@ -440,6 +440,78 @@ export async function cmdMatchFromUrl(opts: {
   }
 }
 
+export async function cmdIngestListing(opts: {
+  file: string;
+  noPricing?: boolean;
+  days?: number;
+  format?: string;
+}): Promise<void> {
+  loadEnv();
+  if (!fs.existsSync(opts.file)) {
+    throw new Error(`Listing file not found: ${opts.file}`);
+  }
+  const raw = JSON.parse(fs.readFileSync(opts.file, 'utf-8'));
+  const { ingestFromListing } = await import('./listing.js');
+  const db = await openDB();
+  try {
+    const result = await ingestFromListing(db, raw, {
+      noPricing: opts.noPricing,
+      days: opts.days,
+    });
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    const totalStr = result.total_reported == null ? '?' : String(result.total_reported);
+    console.log(
+      `[${result.platform}] ${result.poi}  filter="${result.filter_signature}"`,
+    );
+    console.log(
+      `  fetched=${result.fetched}  new_unique=${result.new_unique}  total_in_filter=${totalStr}  ingested_pricing=${result.ingested_pricing}`,
+    );
+    if (result.failures.length) {
+      console.log(`  failures (${result.failures.length}):`);
+      for (const f of result.failures) {
+        console.log(`    ${f.canonical_url}  ← ${f.reason}`);
+      }
+    }
+  } finally {
+    db.close();
+  }
+}
+
+export async function cmdCoverageReport(opts: {
+  poi?: string;
+  platform?: string;
+  format?: string;
+}): Promise<void> {
+  const { buildCoverageReport } = await import('./listing.js');
+  const db = await openDB();
+  try {
+    const rows = buildCoverageReport(db, { poi: opts.poi, platform: opts.platform });
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(rows, null, 2));
+      return;
+    }
+    if (rows.length === 0) {
+      console.log('No coverage runs recorded yet. Run `tours ingest-listing --file <listing.json>` first.');
+      return;
+    }
+    console.log(
+      `${'POI'.padEnd(20)} ${'platform'.padEnd(14)} ${'filters'.padStart(7)} ${'unique'.padStart(7)} ${'total'.padStart(7)} ${'cov%'.padStart(6)}  last_run`,
+    );
+    for (const r of rows) {
+      const total = r.max_total_reported == null ? '?' : String(r.max_total_reported);
+      const cov = r.coverage_pct == null ? '?' : `${(r.coverage_pct * 100).toFixed(0)}%`;
+      console.log(
+        `${r.poi.padEnd(20)} ${r.platform.padEnd(14)} ${String(r.filter_count).padStart(7)} ${String(r.cumulative_unique).padStart(7)} ${total.padStart(7)} ${cov.padStart(6)}  ${r.last_run_at}`,
+      );
+    }
+  } finally {
+    db.close();
+  }
+}
+
 export async function cmdSyncToSupabase(opts: {
   since?: string;
   dryRun?: boolean;

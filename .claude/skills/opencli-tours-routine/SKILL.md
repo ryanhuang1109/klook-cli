@@ -36,6 +36,44 @@ node dist/cli.js tours ingest-pricing <platform> <activity-id> --poi "<POI>" --d
 
 On failure for a specific target, do **not** retry blindly. Invoke the matching `opencli-<platform>` skill and follow its fallback playbook (typically: retry once → `tours ingest-detail` → snapshot replay → `browse` manual capture).
 
+## Step 2b — Listing-driven discovery (bulk capture mode)
+
+When the goal is *coverage* — find activities the planning CSV doesn't yet
+list — feed a Listing JSON instead of fixed (platform, activity_id) pairs.
+The Listing source is **owned by the caller** (a colleague's listing-page
+skill, a manual export, or any future adapter). This routine only consumes
+the JSON.
+
+Listing JSON contract (caller-defined):
+```json
+{
+  "poi": "Mt Fuji",
+  "platform": "klook",
+  "filter_signature": "category=tour&sort=popular",
+  "total_in_filter": 178,
+  "activities": [
+    { "canonical_url": "https://www.klook.com/...", "platform_product_id": "12345", "title": "..." }
+  ]
+}
+```
+
+Run:
+```bash
+node dist/cli.js tours ingest-listing --file path/to/listing.json
+node dist/cli.js tours ingest-listing --file path/to/listing.json --no-pricing  # discovery only
+```
+
+Each invocation appends a `coverage_runs` row recording fetched/new_unique
+counts. Re-running the same listing is idempotent (dedupe is by
+`canonical_url`). Inspect saturation with:
+```bash
+node dist/cli.js tours coverage-report --poi "Mt Fuji"
+```
+
+Coverage% only renders when the caller supplied `total_in_filter`. When it's
+absent, the report still shows `cumulative_unique` per (POI, platform) so
+you can watch the curve flatten across runs.
+
 ## Step 3 — Export and report
 
 ```bash
