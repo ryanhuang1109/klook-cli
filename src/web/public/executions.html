@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Executions — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">Executions</h1>
+        <p class="text-sm text-gray-600">Per-activity scrape attempts — strategy, duration, fallback usage, error messages.</p>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <label>Platform
+          <select id="platform" class="ml-1 border border-gray-300 rounded px-2 py-1 text-sm">
+            <option value="">all</option>
+            <option value="klook">klook</option>
+            <option value="trip">trip</option>
+            <option value="getyourguide">gyg</option>
+            <option value="kkday">kkday</option>
+            <option value="airbnb">airbnb</option>
+          </select>
+        </label>
+        <label>Hours
+          <select id="hours" class="ml-1 border border-gray-300 rounded px-2 py-1 text-sm">
+            <option value="24">24</option>
+            <option value="72" selected>72</option>
+            <option value="168">7 days</option>
+            <option value="">all</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div id="summary" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4"></div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-2">Started</th>
+            <th class="text-left px-4 py-2">Platform</th>
+            <th class="text-left px-4 py-2">Activity</th>
+            <th class="text-left px-4 py-2">Strategy</th>
+            <th class="text-right px-4 py-2">Duration</th>
+            <th class="text-left px-4 py-2">Result</th>
+            <th class="text-right px-4 py-2">Pkg / SKU</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    import { listExecutions } from '/supabase-data.js';
+
+    mountLayout({ active: 'executions' });
+
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v;
+        else if (k === 'text') n.textContent = v;
+        else n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    }
+
+    function fmt(iso) {
+      return iso ? new Date(iso).toISOString().slice(0, 19).replace('T', ' ') : '—';
+    }
+
+    function strategyBadge(s) {
+      const tone = s === 'opencli-pricing' ? 'bg-blue-100 text-blue-800'
+                 : s === 'opencli-detail' ? 'bg-indigo-100 text-indigo-800'
+                 : s === 'opencli-search' ? 'bg-purple-100 text-purple-800'
+                 : s === 'agent-browser-fallback' ? 'bg-amber-100 text-amber-800'
+                 : s === 'snapshot' ? 'bg-gray-200 text-gray-700'
+                 : 'bg-gray-100 text-gray-600';
+      return el('span', { class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${tone}`, text: s });
+    }
+
+    function resultBadge(succeeded, errMsg) {
+      const ok = succeeded === 1 || succeeded === true;
+      const node = el('span', {
+        class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}`,
+        text: ok ? 'OK' : 'FAIL',
+      });
+      const wrap = el('span', { class: 'inline-flex items-center gap-2' }, [node]);
+      if (!ok && errMsg) {
+        wrap.appendChild(el('span', { class: 'text-xs text-gray-500 truncate max-w-md', title: errMsg, text: errMsg.slice(0, 60) }));
+      }
+      return wrap;
+    }
+
+    async function load() {
+      const platform = document.getElementById('platform').value;
+      const hours = document.getElementById('hours').value;
+      const opts = { limit: 200 };
+      if (platform) opts.platform = platform;
+      if (hours) {
+        const since = new Date(Date.now() - parseInt(hours, 10) * 3600 * 1000);
+        opts.sinceIso = since.toISOString();
+      }
+      const tbody = document.getElementById('rows');
+      tbody.replaceChildren();
+      const summary = document.getElementById('summary');
+      summary.replaceChildren();
+
+      try {
+        const rows = await listExecutions(opts);
+        const totalCount = rows.length;
+        const okCount = rows.filter((r) => r.succeeded === 1 || r.succeeded === true).length;
+        const fallbackCount = rows.filter((r) => r.strategy === 'agent-browser-fallback').length;
+        const totalPkg = rows.reduce((a, r) => a + (r.packages_written ?? 0), 0);
+        const totalSku = rows.reduce((a, r) => a + (r.skus_written ?? 0), 0);
+        const card = (label, val) => el('div', { class: 'bg-white border border-gray-200 rounded-lg px-3 py-2.5' }, [
+          el('div', { class: 'text-xs text-gray-500 uppercase tracking-wide', text: label }),
+          el('div', { class: 'text-xl font-bold tabular-nums mt-0.5', text: String(val) }),
+        ]);
+        summary.appendChild(card('Total', totalCount));
+        summary.appendChild(card('Succeeded', okCount));
+        summary.appendChild(card('Fallback used', fallbackCount));
+        summary.appendChild(card('Packages written', totalPkg));
+        summary.appendChild(card('SKUs written', totalSku));
+
+        if (rows.length === 0) {
+          tbody.appendChild(el('tr', {}, [
+            el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '7', text: 'No executions match the filter.' }),
+          ]));
+          return;
+        }
+        for (const r of rows) {
+          tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
+            el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(r.started_at) }),
+            el('td', { class: 'px-4 py-2 text-gray-700', text: r.platform }),
+            el('td', { class: 'px-4 py-2 font-mono text-xs', text: r.activity_id }),
+            el('td', { class: 'px-4 py-2' }, [strategyBadge(r.strategy)]),
+            el('td', { class: 'px-4 py-2 text-right tabular-nums text-gray-600', text: r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : '—' }),
+            el('td', { class: 'px-4 py-2' }, [resultBadge(r.succeeded, r.error_message)]),
+            el('td', { class: 'px-4 py-2 text-right tabular-nums text-xs',
+                      text: `${r.packages_written ?? 0} / ${r.skus_written ?? 0}` }),
+          ]));
+        }
+      } catch (err) {
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-red-600', colspan: '7', text: 'Error: ' + err.message }),
+        ]));
+      }
+    }
+
+    document.getElementById('platform').addEventListener('change', load);
+    document.getElementById('hours').addEventListener('change', load);
+    load();
+  </script>
+</body>
+</html>

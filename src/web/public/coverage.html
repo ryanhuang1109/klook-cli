@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coverage — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">Coverage</h1>
+      <p class="text-sm text-gray-600">Saturation per (POI × platform). Coverage% = unique activities ingested / max(total reported by listing source).</p>
+    </div>
+
+    <div id="status" class="text-sm text-gray-500 mb-3">Loading…</div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-3">POI</th>
+            <th class="text-left px-4 py-3">Platform</th>
+            <th class="text-right px-4 py-3">Filters</th>
+            <th class="text-right px-4 py-3">Unique</th>
+            <th class="text-right px-4 py-3">Reported total</th>
+            <th class="text-right px-4 py-3">Coverage</th>
+            <th class="text-left px-4 py-3">Last run</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    import { buildCoverageReport } from '/supabase-data.js';
+
+    mountLayout({ active: 'coverage' });
+
+    const status = document.getElementById('status');
+    const tbody = document.getElementById('rows');
+
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v;
+        else if (k === 'text') n.textContent = v;
+        else n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    }
+
+    function pct(n) {
+      if (n == null) return '—';
+      const v = Math.round(n * 100);
+      return v + '%';
+    }
+
+    function pctBadge(n) {
+      if (n == null) return el('span', { class: 'text-gray-400', text: '—' });
+      const v = Math.round(n * 100);
+      const tone = v >= 90 ? 'bg-green-100 text-green-800'
+                : v >= 50 ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-red-100 text-red-700';
+      return el('span', { class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${tone}`, text: v + '%' });
+    }
+
+    try {
+      const rows = await buildCoverageReport();
+      status.textContent = `${rows.length} (POI × platform) entries`;
+      if (rows.length === 0) {
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '7', text: 'No coverage runs yet — run `tours ingest-listing` first.' }),
+        ]));
+      }
+      for (const r of rows) {
+        const cells = [
+          el('td', { class: 'px-4 py-2.5 font-medium', text: r.poi ?? '—' }),
+          el('td', { class: 'px-4 py-2.5 text-gray-700', text: r.platform }),
+          el('td', { class: 'px-4 py-2.5 text-right tabular-nums', text: String(r.filter_count) }),
+          el('td', { class: 'px-4 py-2.5 text-right tabular-nums font-medium', text: String(r.cumulative_unique) }),
+          el('td', { class: 'px-4 py-2.5 text-right tabular-nums', text: r.max_total_reported == null ? '—' : String(r.max_total_reported) }),
+          el('td', { class: 'px-4 py-2.5 text-right' }, [pctBadge(r.coverage_pct)]),
+          el('td', { class: 'px-4 py-2.5 text-gray-500 text-xs font-mono', text: r.last_run_at ? new Date(r.last_run_at).toISOString().slice(0, 19).replace('T', ' ') : '—' }),
+        ];
+        tbody.appendChild(el('tr', { class: 'border-t border-gray-100 hover:bg-gray-50' }, cells));
+      }
+    } catch (err) {
+      status.textContent = '';
+      tbody.appendChild(el('tr', {}, [
+        el('td', { class: 'px-4 py-6 text-center text-red-600', colspan: '7', text: 'Error: ' + err.message }),
+      ]));
+    }
+  </script>
+</body>
+</html>

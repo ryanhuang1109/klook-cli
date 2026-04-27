@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cron — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">Cron / Routine</h1>
+      <p class="text-sm text-gray-600">Where the daily routine lives, what host last ran it, and when. Sourced from <code class="text-xs bg-gray-100 px-1 rounded">routine-state.json</code> (built into each Vercel deploy) plus live data freshness from Supabase.</p>
+    </div>
+
+    <div id="summary" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"></div>
+
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold mb-2">Routine config</h2>
+      <div id="config" class="bg-white border border-gray-200 rounded-lg p-4 text-sm font-mono whitespace-pre overflow-auto text-gray-700"></div>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold mb-2">Host machine (last cron run)</h2>
+      <div id="host" class="bg-white border border-gray-200 rounded-lg p-4 text-sm"></div>
+    </section>
+
+    <section>
+      <h2 class="text-lg font-semibold mb-2">Recent sessions captured by routine</h2>
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="text-left px-4 py-2">Started</th>
+              <th class="text-left px-4 py-2">POI</th>
+              <th class="text-left px-4 py-2">Status</th>
+              <th class="text-left px-4 py-2">Duration</th>
+            </tr>
+          </thead>
+          <tbody id="sess-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    import { listSessions } from '/supabase-data.js';
+
+    mountLayout({ active: 'cron' });
+
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v;
+        else if (k === 'text') n.textContent = v;
+        else n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    }
+
+    function fmt(iso) {
+      return iso ? new Date(iso).toISOString().slice(0, 19).replace('T', ' ') : '—';
+    }
+
+    function durationBetween(start, end) {
+      if (!start || !end) return '—';
+      const ms = new Date(end).getTime() - new Date(start).getTime();
+      if (ms < 0 || isNaN(ms)) return '—';
+      const min = Math.round(ms / 60000);
+      return min < 60 ? `${min}m` : `${(min/60).toFixed(1)}h`;
+    }
+
+    async function loadStatic() {
+      let state = null;
+      try {
+        const r = await fetch('/routine-state.json');
+        if (r.ok) state = await r.json();
+      } catch {}
+
+      const summary = document.getElementById('summary');
+      const card = (label, val, sub) => el('div', { class: 'bg-white border border-gray-200 rounded-lg p-4' }, [
+        el('div', { class: 'text-xs text-gray-500 uppercase tracking-wide', text: label }),
+        el('div', { class: 'text-lg font-semibold mt-1', text: String(val ?? '—') }),
+        sub ? el('div', { class: 'text-xs text-gray-500 mt-0.5', text: sub }) : el('span'),
+      ]);
+
+      const host = state?.host;
+      summary.appendChild(card('Last host', host?.hostname ?? '—', host?.last_run ? `last run ${fmt(host.last_run)}` : ''));
+      summary.appendChild(card('Routine entry', state?.config ? '✓ configured' : '— not yet', state?.config?.frequency ?? ''));
+      summary.appendChild(card('Sessions captured', state?.sessions?.length ?? 0, 'in routine-state.json'));
+
+      const config = document.getElementById('config');
+      config.textContent = state?.config ? JSON.stringify(state.config, null, 2) : '(no config in routine-state.json — see scripts/daily-routine.sh)';
+
+      const hostEl = document.getElementById('host');
+      if (!host) {
+        hostEl.appendChild(el('span', { class: 'text-gray-400', text: '(no host info yet — daily-routine.sh stamps this when it runs)' }));
+      } else {
+        const dl = el('dl', { class: 'grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6' });
+        for (const [k, v] of Object.entries(host)) {
+          dl.appendChild(el('dt', { class: 'text-gray-500 text-xs uppercase tracking-wide', text: k }));
+          dl.appendChild(el('dd', { class: 'font-mono text-xs break-all', text: String(v) }));
+        }
+        hostEl.appendChild(dl);
+      }
+    }
+
+    async function loadLiveSessions() {
+      const tbody = document.getElementById('sess-rows');
+      try {
+        const rows = await listSessions(15);
+        if (rows.length === 0) {
+          tbody.appendChild(el('tr', {}, [
+            el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '4', text: 'No sessions yet.' }),
+          ]));
+          return;
+        }
+        for (const s of rows) {
+          tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
+            el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(s.started_at) }),
+            el('td', { class: 'px-4 py-2', text: s.poi || '—' }),
+            el('td', { class: 'px-4 py-2 text-gray-700', text: s.status }),
+            el('td', { class: 'px-4 py-2 text-gray-500', text: durationBetween(s.started_at, s.finished_at) }),
+          ]));
+        }
+      } catch (err) {
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-red-600', colspan: '4', text: 'Error: ' + err.message }),
+        ]));
+      }
+    }
+
+    loadStatic();
+    loadLiveSessions();
+  </script>
+</body>
+</html>

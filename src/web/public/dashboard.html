@@ -22,13 +22,11 @@
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen">
 
-  <!-- Header -->
-  <header class="border-b border-gray-200 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-      <span class="font-mono text-sm font-bold tracking-tight bg-black text-white px-2 py-0.5 rounded">klook-cli</span>
-      <span class="text-gray-400 text-sm font-medium">Competitor Monitor</span>
-    </div>
-  </header>
+  <!-- Header injected by /_layout.js -->
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    mountLayout({ active: 'dashboard' });
+  </script>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 

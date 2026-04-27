@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Runs — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">Runs</h1>
+      <p class="text-sm text-gray-600">Three streams of activity, newest first: tour sessions, listing-coverage runs, and search-based ingest runs.</p>
+    </div>
+
+    <div id="counts" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
+
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold mb-2">Run sessions <span id="sess-count" class="text-sm text-gray-400 font-normal"></span></h2>
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="text-left px-4 py-2">Started</th>
+              <th class="text-left px-4 py-2">POI</th>
+              <th class="text-left px-4 py-2">Keyword</th>
+              <th class="text-left px-4 py-2">Competitors</th>
+              <th class="text-right px-4 py-2">Limit</th>
+              <th class="text-left px-4 py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody id="sess-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold mb-2">Coverage runs (listing → ingest) <span id="cov-count" class="text-sm text-gray-400 font-normal"></span></h2>
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="text-left px-4 py-2">Run at</th>
+              <th class="text-left px-4 py-2">POI</th>
+              <th class="text-left px-4 py-2">Platform</th>
+              <th class="text-left px-4 py-2">Filter</th>
+              <th class="text-right px-4 py-2">Fetched</th>
+              <th class="text-right px-4 py-2">New unique</th>
+              <th class="text-right px-4 py-2">Total reported</th>
+            </tr>
+          </thead>
+          <tbody id="cov-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-lg font-semibold mb-2">Search runs <span id="srch-count" class="text-sm text-gray-400 font-normal"></span></h2>
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="text-left px-4 py-2">Run at</th>
+              <th class="text-left px-4 py-2">Platform</th>
+              <th class="text-left px-4 py-2">Keyword</th>
+              <th class="text-left px-4 py-2">POI</th>
+              <th class="text-right px-4 py-2">Found</th>
+              <th class="text-right px-4 py-2">Ingested</th>
+              <th class="text-right px-4 py-2">OK / Fail</th>
+            </tr>
+          </thead>
+          <tbody id="srch-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    import { listSessions, listCoverageRuns, listSearchRuns, tableCounts } from '/supabase-data.js';
+
+    mountLayout({ active: 'runs' });
+
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v;
+        else if (k === 'text') n.textContent = v;
+        else n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    }
+
+    function fmt(iso) {
+      return iso ? new Date(iso).toISOString().slice(0, 19).replace('T', ' ') : '—';
+    }
+
+    function statusBadge(status) {
+      const tone = status === 'done' ? 'bg-green-100 text-green-800'
+                 : status === 'running' ? 'bg-blue-100 text-blue-800'
+                 : status === 'failed' ? 'bg-red-100 text-red-700'
+                 : 'bg-gray-100 text-gray-600';
+      return el('span', { class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${tone}`, text: status });
+    }
+
+    async function loadCounts() {
+      try {
+        const counts = await tableCounts();
+        const grid = document.getElementById('counts');
+        const labels = [
+          ['Activities', counts.activities],
+          ['Packages', counts.packages],
+          ['SKUs', counts.skus],
+          ['Observations', counts.sku_observations],
+        ];
+        for (const [label, n] of labels) {
+          grid.appendChild(el('div', { class: 'bg-white border border-gray-200 rounded-lg px-4 py-3' }, [
+            el('div', { class: 'text-xs text-gray-500 uppercase tracking-wide', text: label }),
+            el('div', { class: 'text-2xl font-bold tabular-nums mt-1', text: String(n) }),
+          ]));
+        }
+      } catch {}
+    }
+
+    async function loadSessions() {
+      const rows = await listSessions(20);
+      document.getElementById('sess-count').textContent = `(${rows.length})`;
+      const tbody = document.getElementById('sess-rows');
+      for (const s of rows) {
+        let comp = s.competitors;
+        try { comp = JSON.parse(comp); } catch {}
+        if (Array.isArray(comp)) comp = comp.join(', ');
+        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
+          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(s.started_at) }),
+          el('td', { class: 'px-4 py-2', text: s.poi || '—' }),
+          el('td', { class: 'px-4 py-2 text-gray-600', text: s.keyword || '—' }),
+          el('td', { class: 'px-4 py-2 text-gray-600 text-xs', text: comp || '—' }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(s.limit_per_platform ?? '—') }),
+          el('td', { class: 'px-4 py-2' }, [statusBadge(s.status)]),
+        ]));
+      }
+    }
+
+    async function loadCoverage() {
+      const rows = await listCoverageRuns({ limit: 50 });
+      document.getElementById('cov-count').textContent = `(${rows.length})`;
+      const tbody = document.getElementById('cov-rows');
+      for (const r of rows) {
+        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
+          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(r.run_at) }),
+          el('td', { class: 'px-4 py-2', text: r.poi }),
+          el('td', { class: 'px-4 py-2 text-gray-700', text: r.platform }),
+          el('td', { class: 'px-4 py-2 text-xs text-gray-500 font-mono', text: r.filter_signature }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(r.fetched) }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums font-medium', text: String(r.new_unique) }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums text-gray-500', text: r.total_reported == null ? '—' : String(r.total_reported) }),
+        ]));
+      }
+    }
+
+    async function loadSearchRuns() {
+      const rows = await listSearchRuns(50);
+      document.getElementById('srch-count').textContent = `(${rows.length})`;
+      const tbody = document.getElementById('srch-rows');
+      for (const r of rows) {
+        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
+          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(r.run_at) }),
+          el('td', { class: 'px-4 py-2 text-gray-700', text: r.platform }),
+          el('td', { class: 'px-4 py-2 text-gray-600', text: r.keyword }),
+          el('td', { class: 'px-4 py-2', text: r.poi }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(r.total_found) }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(r.ingested) }),
+          el('td', { class: 'px-4 py-2 text-right tabular-nums text-xs',
+                    text: `${r.succeeded} / ${r.failed}` }),
+        ]));
+      }
+    }
+
+    Promise.all([loadCounts(), loadSessions(), loadCoverage(), loadSearchRuns()])
+      .catch((err) => {
+        console.error(err);
+        document.body.appendChild(el('div', {
+          class: 'fixed bottom-4 right-4 bg-red-50 border border-red-200 text-red-800 px-4 py-2 rounded',
+          text: 'Error: ' + err.message,
+        }));
+      });
+  </script>
+</body>
+</html>

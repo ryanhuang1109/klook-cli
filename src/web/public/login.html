@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex items-center justify-center p-4">
+  <main class="w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
+    <div class="flex items-center gap-2 mb-6">
+      <span class="font-mono text-sm font-bold tracking-tight bg-black text-white px-2 py-0.5 rounded">klook-cli</span>
+      <span class="text-gray-400 text-sm font-medium">Competitor Monitor</span>
+    </div>
+
+    <h1 class="text-xl font-semibold mb-1">Sign in</h1>
+    <p class="text-sm text-gray-600 mb-6">Sign in with your authorized corporate Google account to continue.</p>
+
+    <button
+      id="google-btn"
+      type="button"
+      class="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <svg class="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#EA4335" d="M12 5c1.617 0 3.077.555 4.221 1.475l3.137-3.137A11.952 11.952 0 0 0 12 0 11.998 11.998 0 0 0 1.27 6.59l3.658 2.84A7 7 0 0 1 12 5z"/>
+        <path fill="#4285F4" d="M23.49 12.275c0-.815-.07-1.598-.2-2.35H12v4.45h6.46a5.526 5.526 0 0 1-2.39 3.622l3.69 2.86c2.16-1.99 3.73-4.94 3.73-8.582z"/>
+        <path fill="#FBBC05" d="M4.93 14.43A7.04 7.04 0 0 1 4.555 12c0-.84.14-1.65.39-2.43L1.28 6.59A11.998 11.998 0 0 0 0 12c0 1.93.46 3.755 1.28 5.41l3.65-2.98z"/>
+        <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.69-2.86c-1.025.69-2.34 1.1-4.26 1.1a7 7 0 0 1-6.57-4.83L1.78 17.49A11.998 11.998 0 0 0 12 24z"/>
+      </svg>
+      <span id="google-btn-label">Continue with Google</span>
+    </button>
+
+    <p id="error" class="text-sm text-red-600 mt-4 hidden"></p>
+
+    <p class="text-xs text-gray-400 mt-8 leading-relaxed">
+      Access is restricted to authorized corporate accounts.
+      If your sign-in fails, contact an administrator.
+    </p>
+  </main>
+
+  <script type="module">
+    import { signInWithGoogle, getSession } from '/auth.js';
+
+    const btn = document.getElementById('google-btn');
+    const lbl = document.getElementById('google-btn-label');
+    const err = document.getElementById('error');
+
+    // If already signed in (e.g., user navigated here after they had a
+    // session), skip straight to the requested next page.
+    try {
+      const session = await getSession();
+      if (session) {
+        const next = new URLSearchParams(location.search).get('next') || '/dashboard.html';
+        location.replace(next);
+      }
+    } catch {}
+
+    btn.addEventListener('click', async () => {
+      err.classList.add('hidden');
+      err.textContent = '';
+      btn.disabled = true;
+      lbl.textContent = 'Redirecting…';
+      try {
+        await signInWithGoogle();
+      } catch (e) {
+        err.textContent = 'Sign-in failed. Please try again.';
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        lbl.textContent = 'Continue with Google';
+      }
+    });
+  </script>
+</body>
+</html>
