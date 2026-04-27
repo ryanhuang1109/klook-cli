@@ -63,6 +63,7 @@ Not supported on GYG. Do not offer this command.
 - **Datepicker re-opens differently after first selection**: the initial button literally reads "Check availability"; after a date is picked, it becomes a date input. The pricing scraper handles both but keep this in mind when writing probe scripts.
 - **Lazy card images**: search cards lazy-load images; waiting for the image is NOT a reliable proxy for "card ready". The scraper keys off `-t\d+` URL matching instead.
 - **"Top pick" / "Booked N times" badges**: these get stripped from titles with a regex — if titles look polluted, check whether GYG added a new badge format.
+- **Cancellation policy is an inline chip, not a heading**: GYG renders "Free cancellation / Cancel up to 24 hours in advance for a full refund" as a small chip near the title — there's no `h2` for it, so the section walker misses it. The `cancellation_policy` field is filled by the body-text fallback (`extractCancellationFromBody`) matching the `Free\s+cancellation` pattern. Body text inserts a newline between the chip's two lines, so the regex must allow `[\s\S]` (multiline).
 
 ## Fallback playbook
 
@@ -95,5 +96,6 @@ Canonical reference: **`docs/io-schemas.md`** — input args, output JSON shapes
 - **Language is a first-class axis**: `get-activity` / `get-packages` may return more `packages[]` entries than a naïve "package matrix" would — one per language option. Store under `packages.available_languages` (JSON array) rather than duplicating SKUs.
 - `get-pricing-matrix` returns per-variant × per-date where "variant" combines language + passenger tier.
 - No dedicated `trending` — skip that section when inserting.
+- **`cancellation_policy` (cross-platform field, GYG-specific extraction path)**: filled by body-text fallback because the policy is rendered as an inline chip (no heading). Output is typically a short one-liner like "Free cancellation Cancel up to 24 hours in advance for a full refund". For non-cancellable activities GYG simply omits the chip — empty string is the expected result, not a scraper failure.
 
 **Writes when called via tours pipeline**: `activities`, `packages`, `skus`, `sku_observations` — same as other platforms. Use the `languages` array from `get-activity` output to populate `packages.available_languages` JSON.

@@ -73,6 +73,12 @@ export interface KlookDetail {
    * product of these dimensions, though we don't always fan out that way.
    */
   option_dimensions?: { label: string; selected: string; options: string[] }[];
+  /** Cancellation/refund policy text — projected from the standardized "Cancellation policy" section. */
+  cancellation_policy?: string;
+  /** Absolute path to a PNG screenshot written during get-activity (when --screenshot is on). */
+  screenshot_path?: string;
+  /** Inline base64-encoded PNG (when --screenshot base64). Large — opt-in only. */
+  screenshot_base64?: string;
 }
 
 /** A POI (Point of Interest) to monitor across platforms. */

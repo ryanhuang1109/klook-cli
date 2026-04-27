@@ -127,6 +127,7 @@ export function exportToSheetCSV(
     'Rating',
     'Review Count',
     'Order Count',
+    'Cancellation Policy',
     'Notes (platform extras)',
     'SKU Review',
   ];
@@ -169,6 +170,7 @@ export function exportToSheetCSV(
           actSummary?.rating != null ? actSummary.rating.toFixed(1) : '',
           actSummary?.review_count ?? '',
           actSummary?.order_count ?? '',
+          r.cancellation_policy || '',
           extras,
           r.sku_review_status,
         ].map(csvField).join(','),

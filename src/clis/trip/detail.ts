@@ -8,7 +8,8 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseActivityDetail } from '../../shared/parsers.js';
-import { getSectionMapJs } from '../../shared/section-map.js';
+import { getSectionMapJs, getCancellationExtractorJs } from '../../shared/section-map.js';
+import { captureActivityScreenshot } from '../../shared/capture-activity-screenshot.js';
 
 export function parseActivityId(input: string): string {
   const urlMatch = input.match(/\/detail\/(\d+)/);
@@ -22,6 +23,7 @@ export function buildDetailEvaluate(): string {
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
       ${getSectionMapJs()}
+      ${getCancellationExtractorJs()}
 
       // Title: Trip.com uses div[class*=title_foot_warp_left] instead of h1
       // Fall back to document.title with Trip.com suffix stripped
@@ -171,6 +173,16 @@ export function buildDetailEvaluate(): string {
         };
       });
 
+      // Cancellation policy: Trip's FAQ accordion is collapsed at scrape time
+      // so the heading walker often only catches the question title, not the
+      // answer. Fall back to a body-text scan for "Free cancellation" /
+      // "Cancellation policy" inline copy near the booking widget.
+      const cancelSection = sections.find((s) => s.title === 'Cancellation policy');
+      let cancellationPolicy = cancelSection && cancelSection.content.length < 800
+        ? cancelSection.content
+        : '';
+      if (!cancellationPolicy) cancellationPolicy = extractCancellationFromBody(bodyText);
+
       return {
         title,
         description,
@@ -184,6 +196,7 @@ export function buildDetailEvaluate(): string {
         itinerary,
         packages,
         sections,
+        cancellationPolicy,
         url: location.href,
       };
     })()
@@ -263,6 +276,7 @@ cli({
     { name: 'activity', required: true, positional: true, help: 'Activity ID or URL (e.g. "92795279")' },
     { name: 'date', help: 'Specific date (YYYY-MM-DD) to check pricing' },
     { name: 'compare-dates', type: 'boolean', help: 'Compare pricing across all visible dates' },
+    { name: 'screenshot', help: 'Capture viewport screenshot. Value: "auto" (data/screenshots/<platform>-<id>.png), "base64" (inline), or a file path' },
   ],
   columns: ['title', 'rating', 'review_count'],
   defaultFormat: 'json',
@@ -304,8 +318,10 @@ cli({
       const datePricing = await page.evaluate(buildMultiDateEvaluate());
       const pricingByDate = Array.isArray(datePricing) ? datePricing : [];
 
+      const shot = await captureActivityScreenshot(page, 'trip', activityId, kwargs.screenshot as string | undefined);
       return {
         ...detail,
+        ...shot,
         pricing_by_date: pricingByDate,
       };
     }
@@ -346,7 +362,9 @@ cli({
       raw.option_dimensions = dimensions.dimensions;
     }
 
-    return parseActivityDetail(raw);
+    const detail = parseActivityDetail(raw);
+    const shot = await captureActivityScreenshot(page, 'trip', activityId, kwargs.screenshot as string | undefined);
+    return { ...detail, ...shot };
   },
 });
 

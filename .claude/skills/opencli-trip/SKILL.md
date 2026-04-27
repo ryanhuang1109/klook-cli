@@ -58,6 +58,7 @@ Not supported on Trip. Do not offer this command.
 - **Currency by geo**: the returned price string uses whatever currency Trip serves based on Browser Bridge locale. Do not assume USD. Downstream consumers must normalize.
 - **SKU tabs vs date cells share class**: both are `.m_ceil`. Never iterate all `.m_ceil` without the numeric-id filter, or you'll treat dates as SKUs.
 - **Cookie drift**: Browser Bridge cookie staleness is the #1 cause of empty search results. Re-run `opencli doctor` if search returns 0 items on a known-valid keyword.
+- **Cancellation policy lives in a collapsed FAQ accordion**: the heading walker only catches the question title (e.g. "Can I change or cancel my booking?") but not the answer. The `cancellation_policy` field is filled by a body-text fallback (`extractCancellationFromBody`) that scans for "Free cancellation", "Cancel up to N hours/days", or tiered fee schedules. Trip's tiered policy ("Free cancellation 3d before / 30% / 80% / 100%") often extracts cleanly via this path.
 
 ## Fallback playbook
 
@@ -92,5 +93,6 @@ Canonical reference: **`docs/io-schemas.md`** — input args, output JSON shapes
 - `get-activity --compare-dates` emits an **additional** field with the 7-day inline "from" price strip — useful when you want date coverage without the full SKU walk
 - `get-pricing-matrix` output's `package_id` is the numeric SKU tab id (distinguishes from date cells that share the `.m_ceil` class)
 - Currency is whatever Trip serves the Browser Bridge cookie → normalize before inserting into `skus.price_usd`
+- **`cancellation_policy` (cross-platform field, Trip-specific extraction path)**: filled via body-text fallback because Trip's FAQ accordion is collapsed at scrape time. Output is typically the **richest** of the four platforms (full tiered fee schedule with timing windows). If you see only "Free cancellation 3 days before" without the tiered fees, the page may have lazy-rendered after the body read — retry once.
 
 **Writes when called via tours pipeline**: same tables as Klook. `package_id` maps to `packages.platform_package_id`; keep it stable across runs so upserts don't create duplicates.

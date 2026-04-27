@@ -174,6 +174,7 @@ const CANONICAL_FIELDS = new Set([
   'images', 'itinerary', 'packages', 'sections',
   'supplier', 'languages_header', 'tour_type_tag', 'meeting_tag', 'badges',
   'languagesHeader', 'tourTypeTag', 'meetingTag',
+  'cancellation_policy',
   // option_dimensions is captured at the package level, not in activity extras
   'option_dimensions',
 ]);
@@ -226,6 +227,10 @@ export function normalizePricingRun(
     typeof (detail as any).supplier === 'string' && (detail as any).supplier.length > 0
       ? (detail as any).supplier
       : null;
+  const cancellationPolicy =
+    typeof (detail as any).cancellation_policy === 'string' && (detail as any).cancellation_policy.length > 0
+      ? (detail as any).cancellation_policy
+      : null;
   const activityLangHeader =
     typeof (detail as any).languages_header === 'string'
       ? (detail as any).languages_header
@@ -251,6 +256,7 @@ export function normalizePricingRun(
     review_count: reviewCount,
     order_count: orderCount,
     description,
+    cancellation_policy: cancellationPolicy,
     raw_extras_json: JSON.stringify(pickExtras(detail)),
     first_scraped_at: now,
     last_scraped_at: now,

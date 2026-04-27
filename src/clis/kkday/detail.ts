@@ -7,7 +7,8 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseActivityDetail } from '../../shared/parsers.js';
-import { getSectionMapJs } from '../../shared/section-map.js';
+import { getSectionMapJs, getCancellationExtractorJs, getSectionWalkerJs } from '../../shared/section-map.js';
+import { captureActivityScreenshot } from '../../shared/capture-activity-screenshot.js';
 
 export function parseProductId(input: string): string {
   const urlMatch = input.match(/\/product\/(\d+)/);
@@ -21,6 +22,8 @@ export function buildDetailEvaluate(): string {
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
       ${getSectionMapJs()}
+      ${getCancellationExtractorJs()}
+      ${getSectionWalkerJs()}
 
       const title = str(document.querySelector('h1')?.textContent);
       const description = str(
@@ -70,8 +73,15 @@ export function buildDetailEvaluate(): string {
         // Skip package-like h3 headings (those are handled below)
         if (h.tagName === 'H3' && /pass|ticket|tour|bundle|voucher|vip|admission/i.test(orig)) continue;
         seenSections.add(orig.toLowerCase());
-        const sec = h.closest('section, [class*="section"], [class*="module"], [class*="content-block"]') || h.parentElement;
-        const content = str(sec?.textContent)
+        // Use sibling-walk first — KKday's closest('section') over-captures
+        // because many h2/h3 share one outer section element (Cancellation
+        // Policy ends up holding the entire page). Fall back to the closest
+        // section only if it is small enough.
+        const rawContent = extractSectionUntilNextHeading(
+          h,
+          'section, [class*="section"], [class*="module"], [class*="content-block"]'
+        );
+        const content = str(rawContent)
           .replace(orig, '').replace(/Show (more|less)/gi, '').replace(/See (more|less)/gi, '').replace(/Read (more|less)/gi, '')
           .trim().slice(0, 2000);
         if (content.length < 5) continue;
@@ -193,6 +203,21 @@ export function buildDetailEvaluate(): string {
         });
       }
 
+      // Cancellation policy: trust the direct section only when it looks
+      // substantial (≥50 chars OR contains policy keywords). Some KKday
+      // layouts put the heading in one branch and the actual policy text in
+      // a different DOM branch — sibling-walk finds only a useless stub like
+      // "Designated handling fee", in which case we fall back to body-text.
+      const cancelSection = sections.find((s) => s.title === 'Cancellation policy');
+      const directContent = cancelSection ? cancelSection.content : '';
+      const looksSubstantial =
+        directContent.length >= 50 ||
+        /(?:free\\s+cancell|refund|day\\(s\\)|hours?\\s+before)/i.test(directContent);
+      let cancellationPolicy = (looksSubstantial && directContent.length < 800)
+        ? directContent
+        : '';
+      if (!cancellationPolicy) cancellationPolicy = extractCancellationFromBody(bodyText);
+
       return {
         title,
         description,
@@ -206,6 +231,7 @@ export function buildDetailEvaluate(): string {
         itinerary,
         packages,
         sections,
+        cancellationPolicy,
         url: location.href,
       };
     })()
@@ -222,6 +248,7 @@ cli({
   browser: true,
   args: [
     { name: 'product', required: true, positional: true, help: 'Product ID or URL (e.g. "2247" or full KKday URL)' },
+    { name: 'screenshot', help: 'Capture viewport screenshot. Value: "auto" (data/screenshots/<platform>-<id>.png), "base64" (inline), or a file path' },
   ],
   columns: ['title', 'rating', 'review_count'],
   defaultFormat: 'json',
@@ -289,7 +316,9 @@ cli({
     if (dimensions && Array.isArray(dimensions.dimensions)) {
       raw.option_dimensions = dimensions.dimensions;
     }
-    return parseActivityDetail(raw);
+    const detail = parseActivityDetail(raw);
+    const shot = await captureActivityScreenshot(page, 'kkday', productId, kwargs.screenshot as string | undefined);
+    return { ...detail, ...shot };
   },
 });
 

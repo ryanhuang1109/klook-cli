@@ -1,7 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseActivityDetail } from '../../shared/parsers.js';
-import { getSectionMapJs } from '../../shared/section-map.js';
+import { getSectionMapJs, getCancellationExtractorJs } from '../../shared/section-map.js';
 
 export function parseActivityId(input: string): string {
   const urlMatch = input.match(/\/activity\/(\d+)/);
@@ -15,6 +15,7 @@ export function buildDetailEvaluate(): string {
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
       ${getSectionMapJs()}
+      ${getCancellationExtractorJs()}
 
       // Klook is a Vue 2 app — no __NEXT_DATA__. Extract from DOM directly.
       const title = str(document.querySelector('h1')?.textContent);
@@ -240,6 +241,14 @@ export function buildDetailEvaluate(): string {
         sections.push({ title: m.standard, original_title: m.original, content });
       }
 
+      // Cancellation policy: derived from the standardized section. Klook
+      // typically renders this inside a klk-collapse-item titled "Cancellation
+      // policy" — sometimes nested inside "Terms & Conditions". Body-text
+      // fallback catches the embedded sub-heading case.
+      const cancelSection = sections.find((s) => s.title === 'Cancellation policy');
+      let cancellationPolicy = cancelSection ? cancelSection.content : '';
+      if (!cancellationPolicy) cancellationPolicy = extractCancellationFromBody(document.body.innerText);
+
       return {
         title,
         description,
@@ -257,6 +266,7 @@ export function buildDetailEvaluate(): string {
         itinerary,
         packages,
         sections,
+        cancellationPolicy,
         url: location.href,
       };
     })()

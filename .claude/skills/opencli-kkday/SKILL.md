@@ -59,6 +59,8 @@ Not supported on KKday. Do not offer this command.
 - **Locale subpath matters**: `/en/` returns English titles; `/zh-tw/` returns Chinese. The adapter pins `/en/` — if you pass a `/zh-tw/` URL, the scraper rewrites it.
 - **Package category tabs are ordered UI**: tabs appear in a specific order (Admission → Bundle → VIP) and the scraper preserves it. If downstream tools dedupe by title, they may collapse legitimately-different packages that share a name but sit in different tiers.
 - **Cookie/warm-up sensitivity**: the first Browser Bridge request after a cold bridge sometimes returns a skeletal page. Retry-once is typically sufficient; a full warm-up query is rarely needed.
+- **Section walker uses sibling-walk** (since 2026-04-27): the shared `getSectionWalkerJs()` helper walks siblings between a heading and the next heading, falling back to `.closest('section')` only when the enclosing section has ≤3 headings. The previous `.closest('section')` over-capture (Cancellation Policy ending up holding the entire page) is fixed.
+- **Cancellation policy still has a length-floor fallback**: some KKday products (e.g. Mt Fuji 10999) put the "Cancellation Policy" heading and the actual policy text in different DOM branches; sibling-walk finds only a stub like "Designated handling fee". When the direct section is < 50 chars AND lacks policy keywords (`free cancel`, `refund`, `day(s)`, `hours before`), the scraper falls back to `extractCancellationFromBody` for a body-text scan. For such terse products the output may include the sub-heading text ("Cancellation Fee Payment Method Designated handling fee") — that's literally what the page says.
 
 ## Fallback playbook
 
@@ -92,5 +94,6 @@ Canonical reference: **`docs/io-schemas.md`** — input args, output JSON shapes
 - **Booking counter** (`order_count`): KKday is the only platform surfacing "X+ travelers booked"; write into `activities.order_count` after parsing the digits.
 - **"From" prices are minima, not per-SKU**: `get-pricing-matrix` output's `price` is the cheapest across sub-SKUs for that package/date. Do **not** treat this as a single-SKU price when inserting — the `sku` row represents a "package minimum price" not a leaf tier.
 - **Locale-pinned `/en/`**: if a URL comes in with `/zh-tw/`, the adapter rewrites to `/en/` before scraping → the `canonical_url` stored is always the `/en/` variant.
+- **`cancellation_policy` (cross-platform field, KKday-specific extraction path)**: prefers the direct section when it's short (< 800 chars), otherwise body-text fallback. Output is typically two flavors: (1) "Free cancellation until N day(s) before" for cancellable products, (2) "Once the order has been completed, it cannot be canceled, modified, or refunded" + processing-time note for non-refundables (e.g. theme park admissions).
 
 **Writes when called via tours pipeline**: same tables. The package category tiering (Admission / Bundle / VIP) is preserved as part of `packages.title` — do not collapse by name alone, combine with `platform_package_id` for uniqueness.

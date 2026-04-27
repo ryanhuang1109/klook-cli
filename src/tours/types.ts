@@ -45,6 +45,7 @@ export const ActivitySchema = z.object({
   review_count: z.number().nullable(),
   order_count: z.number().nullable(),
   description: z.string().nullable(),
+  cancellation_policy: z.string().nullable(),
   /** Per-platform catch-all: extra fields we scraped but haven't canonicalized yet. */
   raw_extras_json: z.string().default('{}'),
   first_scraped_at: z.string(),

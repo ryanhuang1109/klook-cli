@@ -48,6 +48,7 @@ opencli klook list-trending "<city>" -f json
 - Public API means rate-limit risk is lower than Browser Bridge platforms — it's usually the first platform to try when benchmarking.
 - `detail` sometimes returns fewer packages than the live page shows for multi-region activities; if completeness matters, prefer `pricing` which walks the calendar explicitly.
 - Locale: results default to en-US. The adapter hard-codes this; changing locale requires editing `src/clis/klook/search.ts`.
+- **Cancellation policy is nested inside "Terms & Conditions"**, not its own collapse-item. The standardized "Cancellation policy" section title in `sections[]` may not exist; the `cancellation_policy` field is filled by a body-text scan in `buildDetailEvaluate()` (regex on "Cancellation policy" sub-heading text, trimmed at "Reschedule"/"How to use"/end of section).
 
 ## Fallback playbook
 
@@ -80,6 +81,11 @@ Canonical reference: **`docs/io-schemas.md`** — full input args, output JSON s
 - `supplier` (activities.supplier) — Klook exposes the fulfillment supplier name on the detail page
 - `trending` command output — rank-ordered city activities (not persisted; feeds `ingest-top-from-search`)
 - `get-pricing-matrix` output is typically the **richest** among 4 platforms because Klook's calendar walks every SKU-date cell
+
+**`cancellation_policy` (cross-platform field, Klook-specific extraction path)**:
+- Source: body-text scan of "Cancellation policy: ..." text inside the "Terms & Conditions" collapse-item.
+- Klook usually surfaces ~300–400 chars covering the refund window, weather/operator-cancellation clause, and exclusions for late arrivals.
+- If empty, the page likely loaded before the Terms collapse rendered — retry, or check whether the section walker in `src/clis/klook/detail.ts` still finds `.klk-collapse-item`.
 
 **Writes when called via tours pipeline**:
 - `get-activity` → `activities` row + `packages[]` rows (+ raw_extras_json for images/sections/itinerary)

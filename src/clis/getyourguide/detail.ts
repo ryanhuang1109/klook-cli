@@ -8,7 +8,8 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import type { IPage } from '@jackwener/opencli/registry';
 import { parseActivityDetail } from '../../shared/parsers.js';
-import { getSectionMapJs } from '../../shared/section-map.js';
+import { getSectionMapJs, getCancellationExtractorJs } from '../../shared/section-map.js';
+import { captureActivityScreenshot } from '../../shared/capture-activity-screenshot.js';
 
 export function parseActivityId(input: string): string {
   const urlMatch = input.match(/-t(\d+)/);
@@ -179,6 +180,7 @@ export function buildDetailEvaluate(): string {
     (async () => {
       const str = (v) => v == null ? '' : String(v).trim();
       ${getSectionMapJs()}
+      ${getCancellationExtractorJs()}
 
       const title = str(document.querySelector('h1')?.textContent);
       const description = str(
@@ -376,6 +378,15 @@ export function buildDetailEvaluate(): string {
         }
       }
 
+      // Cancellation policy: GYG renders this either as an h2 or as an inline
+      // chip near the title ("Free cancellation / Cancel up to 24 hours in
+      // advance for a full refund"). Body-text fallback catches the chip case.
+      const cancelSection = sections.find((s) => s.title === 'Cancellation policy');
+      let cancellationPolicy = cancelSection && cancelSection.content.length < 800
+        ? cancelSection.content
+        : '';
+      if (!cancellationPolicy) cancellationPolicy = extractCancellationFromBody(bodyText);
+
       return {
         title,
         description,
@@ -390,6 +401,7 @@ export function buildDetailEvaluate(): string {
         itinerary,
         packages,
         sections,
+        cancellationPolicy,
         url: location.href,
       };
     })()
@@ -406,6 +418,7 @@ cli({
   browser: true,
   args: [
     { name: 'activity', required: true, positional: true, help: 'Activity ID or URL (e.g. "129258" or full GYG URL)' },
+    { name: 'screenshot', help: 'Capture viewport screenshot. Value: "auto" (data/screenshots/<platform>-<id>.png), "base64" (inline), or a file path' },
   ],
   columns: ['title', 'rating', 'review_count'],
   defaultFormat: 'json',
@@ -462,7 +475,9 @@ cli({
 
     raw.option_dimensions = dimensions;
 
-    return parseActivityDetail(raw);
+    const detail = parseActivityDetail(raw);
+    const shot = await captureActivityScreenshot(page, 'getyourguide', parseActivityId(input), kwargs.screenshot as string | undefined);
+    return { ...detail, ...shot };
   },
 });
 

@@ -111,6 +111,7 @@ export interface ActivitySummaryRow {
   rating: number | null;
   review_count: number | null;
   order_count: number | null;
+  cancellation_policy: string | null;
   package_count: number;
   sku_count: number;
   min_price_usd: number | null;
@@ -126,6 +127,7 @@ export interface ExportRow {
   canonical_url: string;
   title: string;
   supplier: string | null;
+  cancellation_policy: string | null;
   poi: string | null;
   departure_city_activity: string | null;
   package_id: string;
@@ -179,6 +181,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
       review_count INTEGER,
       order_count INTEGER,
       description TEXT,
+      cancellation_policy TEXT,
       raw_extras_json TEXT NOT NULL DEFAULT '{}',
       first_scraped_at TEXT NOT NULL,
       last_scraped_at TEXT NOT NULL,
@@ -277,6 +280,16 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
     CREATE INDEX IF NOT EXISTS idx_obs_sku ON sku_observations(sku_id, checked_at);
   `);
 
+  // Lightweight column migrations for DBs created before a column existed.
+  // SQLite has no `ADD COLUMN IF NOT EXISTS`, so probe PRAGMA first.
+  const activityCols = db.prepare(`PRAGMA table_info(activities)`);
+  const existingCols = new Set<string>();
+  while (activityCols.step()) existingCols.add((activityCols.getAsObject() as any).name as string);
+  activityCols.free();
+  if (!existingCols.has('cancellation_policy')) {
+    db.run(`ALTER TABLE activities ADD COLUMN cancellation_policy TEXT`);
+  }
+
   function persist(): void {
     const data = db.export();
     fs.writeFileSync(finalPath, Buffer.from(data));
@@ -302,8 +315,8 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
   return {
     upsertActivity(a) {
       db.run(
-        `INSERT INTO activities (id, platform, platform_product_id, canonical_url, title, supplier, poi, duration_minutes, departure_city, rating, review_count, order_count, description, raw_extras_json, first_scraped_at, last_scraped_at, review_status, review_note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO activities (id, platform, platform_product_id, canonical_url, title, supplier, poi, duration_minutes, departure_city, rating, review_count, order_count, description, cancellation_policy, raw_extras_json, first_scraped_at, last_scraped_at, review_status, review_note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            title = excluded.title,
            supplier = COALESCE(excluded.supplier, activities.supplier),
@@ -314,12 +327,14 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
            review_count = COALESCE(excluded.review_count, activities.review_count),
            order_count = COALESCE(excluded.order_count, activities.order_count),
            description = COALESCE(excluded.description, activities.description),
+           cancellation_policy = COALESCE(excluded.cancellation_policy, activities.cancellation_policy),
            raw_extras_json = excluded.raw_extras_json,
            last_scraped_at = excluded.last_scraped_at`,
         [
           a.id, a.platform, a.platform_product_id, a.canonical_url, a.title,
           a.supplier, a.poi, a.duration_minutes, a.departure_city,
           a.rating, a.review_count, a.order_count, a.description,
+          a.cancellation_policy,
           a.raw_extras_json,
           a.first_scraped_at, a.last_scraped_at, a.review_status, a.review_note,
         ],
@@ -432,6 +447,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
           a.canonical_url AS canonical_url,
           a.title AS title,
           a.supplier AS supplier,
+          a.cancellation_policy AS cancellation_policy,
           a.poi AS poi,
           a.departure_city AS departure_city_activity,
           p.id AS package_id,
@@ -463,6 +479,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
         SELECT
           a.id, a.platform, a.platform_product_id, a.canonical_url, a.title,
           a.poi, a.supplier, a.rating, a.review_count, a.order_count,
+          a.cancellation_policy,
           a.last_scraped_at, a.review_status, a.raw_extras_json,
           COUNT(DISTINCT p.id) AS package_count,
           COUNT(DISTINCT s.id) AS sku_count,

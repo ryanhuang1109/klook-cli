@@ -4,6 +4,45 @@ function str(value: unknown): string {
   return value == null ? '' : String(value).trim();
 }
 
+function extractCancellationPolicy(rawField: unknown, sections: ActivitySection[]): string {
+  const fromField = str(rawField);
+  if (fromField) return fromField;
+  // Stop tokens: where the cancellation chunk visually ends. Platforms concatenate
+  // sub-sections without whitespace separators, so we anchor on common siblings.
+  const stopRe = /(Reschedule[\s\w]*policy|How to use|Voucher (?:type|validity|period)|Notice|Important note|FAQ|Before you book|Pick-up|Confirmation\b|Reserve now|Duration\s*[:\s]*\d|Check availability|Live tour guide|Highlighted reviews|About this activity|Includes\/Excludes|Includes:|Excludes:|Itinerary|Meeting Point|Package Description|Validity Period|Reminders|Policy Info|You might also like)/;
+  const patterns: RegExp[] = [
+    /(?:Cancellation|Refund)\s+policy[:\s]*([\s\S]+)/i,
+    /(Free\s+cancellation[\s\S]+)/i,
+    /(Cancel\s+up\s+to\s+\d+\s+(?:hour|day|business day)[\s\S]+)/i,
+    /(Non[-\s]?refundable[\s\S]+)/i,
+    /(No\s+(?:cancell?ation|refund)s?[\s\S]+)/i,
+  ];
+  // Prefer the section explicitly tagged "Cancellation policy" by section-map, then fall
+  // back to scanning everything. Even on the direct match we run pattern-narrowing because
+  // some platforms (KKday) over-capture via .closest('section') and the standardized
+  // section can hold the entire page.
+  const direct = sections.find((s) => s.title === 'Cancellation policy');
+  const ordered = direct
+    ? [direct, ...sections.filter((s) => s !== direct)]
+    : sections;
+  for (const s of ordered) {
+    for (const re of patterns) {
+      const m = s.content.match(re);
+      if (!m) continue;
+      let chunk = m[1];
+      const stop = chunk.match(stopRe);
+      if (stop && stop.index !== undefined) chunk = chunk.slice(0, stop.index);
+      chunk = chunk.trim();
+      if (chunk.length >= 20) return chunk.slice(0, 2000);
+    }
+  }
+  // Last resort: if the direct section is short enough to be the actual policy, use it
+  if (direct?.content && direct.content.length > 20 && direct.content.length < 800) {
+    return direct.content;
+  }
+  return '';
+}
+
 function toKlookUrl(deeplink: string): string {
   if (!deeplink) return '';
   if (deeplink.startsWith('http')) return deeplink;
@@ -106,5 +145,9 @@ export function parseActivityDetail(raw: unknown): KlookDetail {
     supplier: str(r.supplier),
     // Dropdowns / tabs in the booking widget that represent package-variant axes
     option_dimensions: Array.isArray(r.option_dimensions) ? r.option_dimensions : [],
+    // Cancellation policy: prefer explicit field from the scraper, otherwise the standardized
+    // section, otherwise a substring scan inside other sections (Klook embeds the policy
+    // inside "Terms & Conditions" without a heading break).
+    cancellation_policy: extractCancellationPolicy(r.cancellationPolicy, sections),
   } as KlookDetail;
 }
