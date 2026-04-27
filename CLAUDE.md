@@ -13,6 +13,7 @@ Platform-specific and cross-platform playbooks live as skills under `.claude/ski
 | `opencli-trip` | Trip.com commands + quirks | TODO |
 | `opencli-getyourguide` | GetYourGuide commands + quirks | TODO |
 | `opencli-kkday` | KKday commands + quirks | TODO |
+| `opencli-airbnb` | Airbnb Experiences commands + quirks | klook-cli core team |
 | `opencli-tours-routine` | Daily tours ingest → export → report playbook | shared |
 | `opencli-compare-poi` | Cross-platform POI compare workflow | shared |
 
