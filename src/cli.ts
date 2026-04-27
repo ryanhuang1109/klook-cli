@@ -485,6 +485,36 @@ toursCmd
     }
   });
 
+toursCmd
+  .command('sync-to-supabase')
+  .description('Mirror the local tours DB to the Supabase Postgres project')
+  .option('--since <iso>', 'Only sync time-based rows newer than this ISO timestamp')
+  .option('--dry-run', 'Report counts only — do not write to Supabase')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .action(async (opts: { since?: string; dryRun?: boolean; format?: string }) => {
+    const { cmdSyncToSupabase } = await import('./tours/commands.js');
+    try {
+      await cmdSyncToSupabase({ since: opts.since, dryRun: opts.dryRun, format: opts.format });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
+  .command('verify-supabase-sync')
+  .description('Compare row counts between local SQLite and Supabase')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .action(async (opts: { format?: string }) => {
+    const { cmdVerifySupabaseSync } = await import('./tours/commands.js');
+    try {
+      await cmdVerifySupabaseSync({ format: opts.format });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 // ── Compare history command ───────────────────────────────────────
 program
   .command('get-poi-price-history <name>')

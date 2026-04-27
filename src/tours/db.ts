@@ -49,7 +49,26 @@ export interface ToursDB {
   listExecutionsForSession(sessionId: string): ExecutionLog[];
   listRecentExecutions(opts?: { sinceHoursAgo?: number; limit?: number }): ExecutionLog[];
 
+  /**
+   * Raw dump for the Supabase mirror. Returns SQLite-shape rows (booleans as
+   * 0/1, array fields as JSON strings) — the sync layer is responsible for
+   * the PG-shape transform. `since` filters the time-based tables on their
+   * timestamp column; reference tables (activities/packages/skus) are always
+   * returned in full because they're upserted by primary key.
+   */
+  dumpForSync(opts?: { since?: string }): SyncDump;
+
   close(): void;
+}
+
+export interface SyncDump {
+  activities: any[];
+  packages: any[];
+  skus: any[];
+  observations: any[];
+  sessions: any[];
+  executions: any[];
+  searchRuns: any[];
 }
 
 export interface SearchRunLog {
@@ -581,6 +600,37 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
         [status, note, id],
       );
       persist();
+    },
+
+    dumpForSync(opts = {}) {
+      const since = opts.since ?? null;
+      const activities = all<any>(`SELECT * FROM activities`);
+      const packages = all<any>(`SELECT * FROM packages`);
+      const skus = all<any>(`SELECT * FROM skus`);
+      const observations = since
+        ? all<any>(
+            `SELECT * FROM sku_observations WHERE checked_at >= ? ORDER BY id`,
+            [since],
+          )
+        : all<any>(`SELECT * FROM sku_observations ORDER BY id`);
+      const sessions = all<any>(`SELECT * FROM run_sessions`);
+      const executions = since
+        ? all<any>(
+            `SELECT * FROM execution_logs WHERE started_at >= ? ORDER BY id`,
+            [since],
+          )
+        : all<any>(`SELECT * FROM execution_logs ORDER BY id`);
+      const searchRuns = since
+        ? all<any>(
+            `SELECT id, platform, keyword, poi, total_found, ingested, succeeded, failed, run_at
+             FROM search_runs WHERE run_at >= ? ORDER BY id`,
+            [since],
+          )
+        : all<any>(
+            `SELECT id, platform, keyword, poi, total_found, ingested, succeeded, failed, run_at
+             FROM search_runs ORDER BY id`,
+          );
+      return { activities, packages, skus, observations, sessions, executions, searchRuns };
     },
 
     close() {

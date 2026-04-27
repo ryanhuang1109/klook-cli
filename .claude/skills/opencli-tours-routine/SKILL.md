@@ -43,6 +43,14 @@ node dist/cli.js tours export-csv                 # writes data/exports/<today>.
 node dist/cli.js tours generate-report                 # writes data/reports/<today>.html + latest.html
 ```
 
+## Step 3b — Mirror to Supabase (best-effort)
+
+```bash
+node dist/cli.js tours sync-to-supabase || echo "sync failed — local SQLite is still source of truth"
+```
+
+Sync is **non-blocking**: a failure here must not abort the routine, because SQLite remains the canonical store. Re-runs are idempotent (upsert by primary key; `sku_observations` deduped by `(sku_id, checked_at)`). After unusual events (schema change, large backfill), follow up with `tours verify-supabase-sync` and report any `MISMATCH` rows in the run summary.
+
 ## Step 4 — Check completeness
 
 Open the JSON summary emitted alongside the report (path printed by `tours report`). Look at `completeness_flags`:

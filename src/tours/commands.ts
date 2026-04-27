@@ -439,3 +439,56 @@ export async function cmdMatchFromUrl(opts: {
     if (m.reasons.length) console.log(`        why: ${m.reasons.join(' · ')}`);
   }
 }
+
+export async function cmdSyncToSupabase(opts: {
+  since?: string;
+  dryRun?: boolean;
+  format?: string;
+}): Promise<void> {
+  loadEnv();
+  const { syncToSupabase } = await import('./supabase-sync.js');
+  const db = await openDB();
+  try {
+    const result = await syncToSupabase(db, { since: opts.since, dryRun: opts.dryRun });
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    const tag = result.dryRun ? '[dry-run] would upsert' : 'Upserted';
+    console.log(`${tag} (${result.durationMs}ms):`);
+    for (const [table, n] of Object.entries(result.counts)) {
+      console.log(`  ${table.padEnd(18)} ${n}`);
+    }
+  } finally {
+    db.close();
+  }
+}
+
+export async function cmdVerifySupabaseSync(opts: { format?: string }): Promise<void> {
+  loadEnv();
+  const { verifySupabaseSync } = await import('./supabase-sync.js');
+  const db = await openDB();
+  try {
+    const rows = await verifySupabaseSync(db);
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(rows, null, 2));
+      return;
+    }
+    console.log('Row count check (Supabase >= SQLite expected):');
+    console.log(
+      `  ${'table'.padEnd(18)} ${'sqlite'.padStart(8)} ${'supabase'.padStart(10)}  ok`,
+    );
+    let allOk = true;
+    for (const r of rows) {
+      const sb = r.supabase == null ? 'ERROR' : String(r.supabase);
+      const flag = r.ok ? 'OK' : 'MISMATCH';
+      if (!r.ok) allOk = false;
+      console.log(
+        `  ${r.table.padEnd(18)} ${String(r.sqlite).padStart(8)} ${sb.padStart(10)}  ${flag}`,
+      );
+    }
+    if (!allOk) process.exitCode = 2;
+  } finally {
+    db.close();
+  }
+}
