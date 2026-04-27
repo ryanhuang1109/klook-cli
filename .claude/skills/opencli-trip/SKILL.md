@@ -75,6 +75,7 @@ If multiple Trip targets fail in the same run, the issue is almost always Browse
 - **Empty SKU list**: Trip occasionally lazy-renders the SKU tab row if the page loaded while scrolled past it. The scraper scrolls to top before extracting — if you still get empty, check whether Trip redesigned `.sku_tab_ceil`.
 - **Date cell "TBD"**: Some SKUs don't have availability for all 7 days; the scraper returns empty-string price rather than dropping the row. Downstream consumers should treat empty price as "unknown", not "zero".
 - **Region redirect**: Requests from a non-en locale sometimes redirect to zh-CN Ctrip (DOM differs completely). Pin Browser Bridge to an en-US cookie.
+- **`No SKU tabs found` on single-package products** *(open, observed 2026-04-27)*: When a product has only one bookable package, Trip doesn't render the `.sku_tab_ceil` row at all — the scraper sees zero `.m_ceil` SKU candidates and bails with `code: UNKNOWN, message: "No SKU tabs found on Trip.com page. Page structure may have changed or product has only one [package]"`. Confirmed reproducible on Mt Fuji products `105146444` and `103219360` (both single-package). Fix: in `src/clis/trip/pricing.ts`, when no SKU tabs are detected, fall back to scraping the visible 7-day price strip directly and synthesize one package row (mirroring how `airbnb/pricing.ts` handles single-package experiences). Don't treat the empty tab list as a failure — it's a legitimate single-SKU product shape.
 
 ## Touchpoints
 

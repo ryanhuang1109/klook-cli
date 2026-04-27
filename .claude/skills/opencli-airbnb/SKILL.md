@@ -109,6 +109,7 @@ When `opencli airbnb get-activity <id>` fails or returns empty:
 - **Title is correct but `packages[]` is empty**: the booking widget didn't hydrate before scrape. Response: increase `page.wait` in `src/clis/airbnb/detail.ts` or scroll past the sidebar to force render.
 - **Region-locked experience**: some experiences only show price after geo-detection. Response: verify the experience is bookable from the Browser Bridge's geo, otherwise flag via `tours set-activity-review-status <id> flagged --note "region-locked"`.
 - **Search returns stays cards mixed with experiences**: the URL `/experiences` filter sometimes leaks. The scraper filters on the `/experiences/<id>` URL pattern, so non-experience cards are dropped silently. Symptom: `limit=20` returns < 20 results on a busy keyword.
+- **`pricing` succeeds but tours DB writes 0 packages/skus** *(open, observed 2026-04-27)*: `opencli airbnb pricing <id>` returns rows and `tours ingest-listing` reports `ingested_pricing=N`, but downstream `packages` and `skus` tables stay empty. Root cause: `src/clis/airbnb/pricing.ts` emits row fields `daily_min_price` / `daily_min_price_raw`, but `src/tours/normalize.ts` reads the shared contract field `price` / `price_raw` (defined on `PricingRowRaw` in `src/tours/types.ts`). The rows arrive with `price=undefined`, so the SKU loop produces no priced records. Fix: rename the two fields in airbnb/pricing.ts (or add aliases in the row builder); do **not** add airbnb-specific branches to normalize.ts — the row contract is meant to be platform-agnostic.
 
 ## Touchpoints
 
