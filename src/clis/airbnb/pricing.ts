@@ -53,14 +53,18 @@ function buildTargetDates(days: number): { iso: string; year: number; month: num
 const OPEN_PICKER_JS = `
   (async () => {
     const delay = (ms) => new Promise(r => setTimeout(r, ms));
+    // Locale-aware: text labels Airbnb uses across en / zh-TW / zh-CN / ja / ko.
+    // Anchored to whole-button text so we don't accidentally click an FAQ link.
+    const PICKER_LABEL_RE = /^(check availability|select date|add date|choose date|查詢空房|選擇日期|加入日期|選日期|检查可用情况|选择日期|添加日期|空き状況を確認|日付を選択|日付を追加|날짜 선택|예약 가능 여부 확인)$/i;
     const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
     const picker = buttons.find((b) => {
       const t = (b.textContent || '').trim();
-      return /^check availability$/i.test(t)
-          || /^select date$/i.test(t)
-          || /^add date$/i.test(t)
-          || /^choose date$/i.test(t);
-    }) || document.querySelector('[data-testid*="datepicker"], [aria-label*="date" i]');
+      return PICKER_LABEL_RE.test(t);
+    })
+      // Structural fallbacks (locale-independent) — testid is developer-set,
+      // aria-label may carry the localized "date/日期/日付/날짜" word.
+      || document.querySelector('[data-testid*="datepicker"], [data-testid*="calendar"]')
+      || document.querySelector('[aria-label*="date" i], [aria-label*="日期"], [aria-label*="日付"], [aria-label*="날짜"]');
     if (!picker) return { ok: false, reason: 'no-picker-trigger' };
     picker.click();
     await delay(800);
@@ -81,6 +85,21 @@ function buildCalNavigateJs(targetYear: number, targetMonth: number): string {
       const targetM = ${targetMonth};
       const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+      // Parse a month index (1-12) from an arbitrary header string.
+      // Handles English long form ("May") and CJK numeric forms ("5月" / "5 月" / "5월").
+      // Korean uses 월 (different codepoint from Chinese/Japanese 月) — accept both.
+      function parseMonth(txt) {
+        for (let i = 0; i < 12; i++) {
+          if (txt.includes(monthNames[i])) return i + 1;
+        }
+        const cjk = txt.match(/(\\d{1,2})\\s*[月월]/);
+        if (cjk) {
+          const m = parseInt(cjk[1], 10);
+          if (m >= 1 && m <= 12) return m;
+        }
+        return 0;
+      }
+
       for (let step = 0; step < MAX; step++) {
         // Read currently-visible month label(s). Airbnb uses an h2 or similar
         // heading inside the calendar grid.
@@ -90,13 +109,20 @@ function buildCalNavigateJs(targetYear: number, targetMonth: number): string {
         let curY = 0, curM = 0;
         for (const h of headers) {
           const txt = (h.textContent || '').trim();
-          for (let i = 0; i < 12; i++) {
-            if (txt.includes(monthNames[i])) { curM = i + 1; break; }
-          }
+          curM = parseMonth(txt);
           const yMatch = txt.match(/(20\\d{2})/);
           if (curM && yMatch) { curY = parseInt(yMatch[1], 10); break; }
         }
-        if (!curY || !curM) return { ok: false, reason: 'no-month-label' };
+        if (!curY || !curM) {
+          // Diagnostic dump — first 3 header texts and visible-cell aria-labels
+          // so we can see why parseMonth missed (locale variants, structural
+          // change, picker not actually open).
+          const headerSample = headers.slice(0, 3).map(h => (h.textContent || '').trim().slice(0, 80));
+          const cellSample = Array.from(document.querySelectorAll(
+            '[role="button"][aria-label*=", "], button[aria-label*=", "], td[role="button"]'
+          )).slice(0, 3).map(c => (c.getAttribute('aria-label') || '').slice(0, 80));
+          return { ok: false, reason: 'no-month-label', headerCount: headers.length, headerSample, cellSample };
+        }
         if (curY === targetY && curM === targetM) return { ok: true, steps: step };
         // Pick navigation button
         const isForward = (targetY * 12 + targetM) > (curY * 12 + curM);
@@ -129,14 +155,19 @@ const READ_CAL_CELLS_JS = `
     const out = [];
     for (const c of cells) {
       const aria = str(c.getAttribute('aria-label'));
-      // Match e.g. "Saturday, May 2, 2026" — discard cells that don't fit
-      const m = aria.match(/^[^,]+,\\s*([A-Z][a-z]+)\\s+(\\d{1,2}),\\s*(20\\d{2})/);
-      if (!m) continue;
-      const monthIdx = monthNames.indexOf(m[1]);
-      if (monthIdx < 0) continue;
-      const day = parseInt(m[2], 10);
-      const year = parseInt(m[3], 10);
-      const month = monthIdx + 1;
+      let year = 0, month = 0, day = 0;
+      // English: "Saturday, May 2, 2026"
+      let m = aria.match(/^[^,]+,\\s*([A-Z][a-z]+)\\s+(\\d{1,2}),\\s*(20\\d{2})/);
+      if (m) {
+        const monthIdx = monthNames.indexOf(m[1]);
+        if (monthIdx >= 0) { year = parseInt(m[3], 10); month = monthIdx + 1; day = parseInt(m[2], 10); }
+      }
+      // CJK: "2026年5月2日 星期六" / "2026年5月2日土曜日" / "2026년 5월 2일"
+      if (!month) {
+        m = aria.match(/(20\\d{2})\\s*[年년]\\s*(\\d{1,2})\\s*[月월]\\s*(\\d{1,2})\\s*[日일]/);
+        if (m) { year = parseInt(m[1], 10); month = parseInt(m[2], 10); day = parseInt(m[3], 10); }
+      }
+      if (!year || !month || !day) continue;
       // Availability: aria sometimes says "Not available" or "Unavailable".
       const unavailable = /not available|unavailable|past date/i.test(aria);
       const disabled = c.hasAttribute('disabled') || c.getAttribute('aria-disabled') === 'true';
@@ -229,8 +260,11 @@ cli({
 
       const nav = await page.evaluate(buildCalNavigateJs(y, m)) as any;
       if (!nav?.ok) {
+        const diag = nav?.headerSample || nav?.cellSample
+          ? ` headers=${JSON.stringify(nav.headerSample || []).slice(0, 200)} cells=${JSON.stringify(nav.cellSample || []).slice(0, 200)}`
+          : '';
         for (const t of monthTargets) {
-          errors.push({ date: t.iso, reason: `cal-nav-failed: ${nav?.reason}` });
+          errors.push({ date: t.iso, reason: `cal-nav-failed: ${nav?.reason}${diag}` });
         }
         continue;
       }
