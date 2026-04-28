@@ -18,17 +18,17 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function buildTargetDates(days: number): { iso: string; ariaLabel: string }[] {
+function buildTargetDates(days: number): { iso: string; year: number; monthIdx: number; day: number }[] {
   const today = new Date();
-  const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const out: { iso: string; ariaLabel: string }[] = [];
+  const out: { iso: string; year: number; monthIdx: number; day: number }[] = [];
   for (let i = 1; i <= days; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     out.push({
       iso: formatDate(d),
-      ariaLabel: `${weekdays[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`,
+      year: d.getFullYear(),
+      monthIdx: d.getMonth(),  // 0-indexed; matches GYG's #month-YYYY-M id format
+      day: d.getDate(),
     });
   }
   return out;
@@ -75,16 +75,34 @@ const OPEN_DATEPICKER_JS = `
   })()
 `;
 
-/** Click a specific date cell by aria-label. */
-function buildClickDateJs(ariaLabel: string): string {
+/**
+ * Click a specific date cell by its structural position.
+ *
+ * Locale-blind: navigates to `#month-YYYY-M` (the month section id GYG
+ * uses regardless of UI language; verified via probe under zh-TW where
+ * everything else was Chinese but the id stayed numeric), then finds the
+ * day cell by exact text-content match. Earlier we relied on
+ * aria-label = "Wednesday, May 13, 2026" — that string is localised by GYG
+ * into the page locale, so under a zh-TW Browser Bridge cookie every date
+ * click failed silently.
+ */
+function buildClickDateJs(year: number, monthIdx: number, day: number): string {
   return `
     (() => {
-      const cells = Array.from(document.querySelectorAll('[aria-label=${JSON.stringify(ariaLabel)}]'));
-      // Prefer the button-role element with datepicker-day class
-      const cell = cells.find((c) => /c-datepicker-day/.test(c.className));
-      if (!cell) return { ok: false, reason: 'no-cell' };
-      const disabled = cell.getAttribute('aria-disabled') === 'true' || cell.classList.contains('c-datepicker-day--disabled');
-      if (disabled) return { ok: false, reason: 'disabled', date: ${JSON.stringify(ariaLabel)} };
+      const section = document.querySelector('#month-${year}-${monthIdx}');
+      if (!section) return { ok: false, reason: 'month-section-missing', want: 'month-${year}-${monthIdx}' };
+      const cells = Array.from(section.querySelectorAll('.c-datepicker-day, [class*="c-datepicker-day"]'));
+      const cell = cells.find((c) => {
+        // Day cell text is just the day number; trim/strip any wrapping spans.
+        const txt = (c.textContent || '').trim();
+        // Match leading day digits before any space (some templates put "13\\n$372").
+        const m = txt.match(/^(\\d{1,2})\\b/);
+        return m && parseInt(m[1], 10) === ${day};
+      });
+      if (!cell) return { ok: false, reason: 'day-cell-not-found', day: ${day} };
+      const disabled = cell.getAttribute('aria-disabled') === 'true'
+        || /c-datepicker-day--disabled|c-datepicker-day--out-of-range/.test(cell.className);
+      if (disabled) return { ok: false, reason: 'disabled', day: ${day} };
       cell.scrollIntoView({ behavior: 'auto', block: 'center' });
       cell.click();
       return { ok: true };
@@ -127,17 +145,36 @@ const READ_VARIANTS_JS = `
     }
 
     // Sticky booking bar — captures price when no option cards render
-    // (single-variant product, e.g. Tokyo Disneyland 1-Day Passport).
+    // (single-variant product, e.g. Tokyo Disneyland 1-Day Passport, OR
+    // when GYG renders pricing in a non-USD currency under a localised
+    // session like zh-TW which uses "USD373" instead of "$373").
     const bar = document.querySelector('[class*="sticky-booking"], [class*="booking-assistant-configurator"]');
-    let barPrice = '', barText = '';
+    let barPrice = '', barText = '', barCurrency = '';
+    // Helper: try multiple currency formats — ISO prefix ("USD373") and
+    // symbol ("$373" / "€100" / "¥10000"). Localised sessions favour the
+    // ISO prefix; default en-US uses the glyph.
+    const PRICE_RE = /(USD|EUR|GBP|JPY|TWD|HKD|SGD|CNY|KRW|AUD|CAD|\\$|€|£|¥|₩)\\s?([\\d,]+(?:\\.\\d{1,2})?)(?!\\d)/;
     if (bar) {
       barText = str(bar.textContent);
-      // Skip the leading "From" price — find the FIRST $nn.nn after any action label
-      const priceMatch = barText.match(/\\$\\s?([\\d]+(?:\\.\\d{1,2})?)(?!\\d)/);
-      barPrice = priceMatch ? priceMatch[1] : '';
+      // Prefer the actual (post-discount) price — GYG renders it in
+      // .price-info-actual-price-explanation; .price-info-from-base-price
+      // holds the strikethrough original. Fall back to whichever the bar
+      // shows when neither subselector is present.
+      const actual = bar.querySelector('[class*="actual-price"], [class*="price-info-actual"]');
+      const fromBase = bar.querySelector('[class*="from-base-price"], [class*="price-info-from"]');
+      const candidates = [actual, fromBase, bar].filter(Boolean);
+      for (const node of candidates) {
+        const text = str(node.textContent);
+        const m = text.match(PRICE_RE);
+        if (m) {
+          barCurrency = m[1];
+          barPrice = m[2].replace(/,/g, '');
+          break;
+        }
+      }
     }
 
-    return { variants: out, barPrice, barText: barText.slice(0, 200) };
+    return { variants: out, barPrice, barCurrency, barText: barText.slice(0, 300) };
   })()
 `;
 
@@ -194,7 +231,7 @@ cli({
       }
       await page.wait(2200);
 
-      const click = await page.evaluate(buildClickDateJs(t.ariaLabel)) as any;
+      const click = await page.evaluate(buildClickDateJs(t.year, t.monthIdx, t.day)) as any;
       if (!click?.ok) {
         errors.push({ date: t.iso, reason: click?.reason || 'click-failed' });
         continue;
@@ -217,12 +254,17 @@ cli({
             variant_index: 0,
             package_name: meta?.title || '',
             price: read.barPrice,
-            currency: 'USD',
+            // ISO codes pass through unchanged; symbol fallbacks are
+            // mapped to USD as a guess. The Browser Bridge cookie pins
+            // currency, so this is informational for the analyst.
+            currency: read.barCurrency && read.barCurrency.length === 3
+              ? read.barCurrency
+              : 'USD',
             price_raw: read.barText,
             availability: 'Available',
           });
         } else {
-          errors.push({ date: t.iso, reason: 'no-variants-and-no-bar-price' });
+          errors.push({ date: t.iso, reason: `no-variants-and-no-bar-price (barText=${(read?.barText || '').slice(0, 80)})` });
         }
         continue;
       }
