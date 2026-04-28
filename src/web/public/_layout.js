@@ -18,7 +18,6 @@ const NAV = [
   { href: '/coverage.html', label: 'Coverage', key: 'coverage' },
   { href: '/runs.html', label: 'Runs', key: 'runs' },
   { href: '/executions.html', label: 'Executions', key: 'executions' },
-  { href: '/tours.html', label: 'Tours', key: 'tours' },
   { href: '/cron.html', label: 'Cron', key: 'cron' },
   { href: '/archive.html', label: 'Archive', key: 'archive' },
 ];
@@ -52,7 +51,7 @@ export async function mountLayout({ active }) {
   const brand = el('a', { href: '/', class: 'flex items-center gap-2 shrink-0' }, [
     el('span', {
       class: 'font-mono text-sm font-bold tracking-tight bg-black text-white px-2 py-0.5 rounded',
-      text: 'klook-cli',
+      text: 'CSI',
     }),
     el('span', {
       class: 'text-gray-400 text-sm font-medium hidden sm:inline',
