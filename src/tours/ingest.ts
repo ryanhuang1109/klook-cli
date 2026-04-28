@@ -234,6 +234,27 @@ function snapshotPath(dir: string, platform: string, activityId: string): string
   return path.join(dir, `${platform}-${safe}-${stamp}.json`);
 }
 
+/**
+ * Merge `existing.raw_extras_json` into `normalized.raw_extras_json` so that
+ * re-ingesting an activity (e.g. running `tours ingest-detail` without
+ * `--screenshot`) doesn't overwrite previously-stored extras like
+ * `screenshot_url`. New fields take precedence; old fields the new scrape
+ * didn't surface are preserved.
+ *
+ * Mutates `normalized.activity.raw_extras_json` in place.
+ */
+function mergeRawExtras(
+  normalized: { activity: { raw_extras_json: string } },
+  existing: { raw_extras_json: string } | null,
+): void {
+  if (!existing?.raw_extras_json) return;
+  let oldX: Record<string, unknown> = {};
+  let newX: Record<string, unknown> = {};
+  try { oldX = JSON.parse(existing.raw_extras_json); } catch { return; }
+  try { newX = JSON.parse(normalized.activity.raw_extras_json || '{}'); } catch { return; }
+  normalized.activity.raw_extras_json = JSON.stringify({ ...oldX, ...newX });
+}
+
 export async function ingestPricing(
   db: ToursDB,
   opts: IngestOptions,
@@ -257,6 +278,7 @@ export async function ingestPricing(
   if (existing) {
     normalized.activity.first_scraped_at = existing.first_scraped_at;
   }
+  mergeRawExtras(normalized, existing);
   db.upsertActivity(normalized.activity);
 
   for (const pkg of normalized.packages.values()) {
@@ -521,6 +543,7 @@ export async function ingestFromDetail(
 
   const existing = db.getActivity(normalized.activity.id);
   if (existing) normalized.activity.first_scraped_at = existing.first_scraped_at;
+  mergeRawExtras(normalized, existing);
   db.upsertActivity(normalized.activity);
   for (const pkg of normalized.packages.values()) db.upsertPackage(pkg);
   for (const sku of normalized.skus) db.upsertSKU(sku);
@@ -568,6 +591,7 @@ export async function ingestFromSnapshot(
   if (existing) {
     normalized.activity.first_scraped_at = existing.first_scraped_at;
   }
+  mergeRawExtras(normalized, existing);
   db.upsertActivity(normalized.activity);
   for (const pkg of normalized.packages.values()) db.upsertPackage(pkg);
   for (const sku of normalized.skus) db.upsertSKU(sku);
