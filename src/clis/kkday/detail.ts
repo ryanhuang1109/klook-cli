@@ -55,12 +55,29 @@ export function buildDetailEvaluate(): string {
         supplier = supMatch[1].trim().replace(/^[:\\s\\-]+/, '').slice(0, 120);
       }
 
-      // Images
+      // Images.
+      // KKday Nuxt SPA renders the cover gallery with class
+      // pb-image-grid__img. Earlier the selector was a broad
+      // img[src*=kkday] which also matched the logo SVG at
+      // cdn.kkday.com/web-b2c/_nuxt/images/logo/kkday_logo_final.svg
+      // and used it as first_image. Try the cover-grid class first,
+      // then a CDN scan with explicit logo / nuxt / svg exclusions.
       const seenImgs = new Set();
-      const images = Array.from(document.querySelectorAll('img[src*="kkday"], img[src*="cdn"]'))
+      const coverImgs = Array.from(document.querySelectorAll('img.pb-image-grid__img'))
         .map((img) => img.src)
-        .filter((src) => (src.includes('product') || src.includes('image')) && !seenImgs.has(src) && (seenImgs.add(src), true))
-        .slice(0, 10);
+        .filter((src) => src && !seenImgs.has(src) && (seenImgs.add(src), true));
+      const fallbackImgs = Array.from(document.querySelectorAll('img[src*="kkday"]'))
+        .map((img) => img.src)
+        .filter((src) =>
+          src
+          && src.includes('product')
+          && !src.includes('/_nuxt/')        // built nuxt static assets
+          && !src.includes('/logo/')          // logo path
+          && !src.toLowerCase().endsWith('.svg') // svgs are usually icons/logos
+          && !seenImgs.has(src)
+          && (seenImgs.add(src), true)
+        );
+      const images = [...coverImgs, ...fallbackImgs].slice(0, 10);
 
       // ── Sections: capture all h2/h3 sections ──
       const sections = [];
