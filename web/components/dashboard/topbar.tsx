@@ -6,6 +6,7 @@ import { TopbarNav } from './topbar-nav';
 
 const NAV = [
   { href: '/activities', label: 'Activities' },
+  { href: '/packages', label: 'Packages' },
   { href: '/skus', label: 'SKUs' },
   { href: '/coverage', label: 'Coverage' },
   { href: '/runs', label: 'Runs' },

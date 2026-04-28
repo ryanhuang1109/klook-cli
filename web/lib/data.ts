@@ -144,6 +144,94 @@ export async function listPackagesForActivity(activityId: number): Promise<Packa
   return (data ?? []) as PackageRow[];
 }
 
+export type PackageWithStats = {
+  id: number;
+  activity_id: number;
+  platform: Platform;
+  poi: string | null;
+  activity_title: string | null;
+  platform_product_id: string | null;
+  package_title: string | null;
+  platform_package_id: string | null;
+  tour_type: string | null;
+  group_size: string | null;
+  meals: boolean | null;
+  departure_city: string | null;
+  available_languages: string[] | string | null;
+  duration_minutes: number | null;
+  sku_count: number;
+  min_price_usd: number | null;
+  max_price_usd: number | null;
+  last_checked_at: string | null;
+};
+
+/**
+ * One row per package, with parent-activity context (platform/poi/title) and
+ * SKU aggregates (count, price range, last check). The aggregates are
+ * computed client-side instead of via a Postgres view since we don't have
+ * one for this shape — running an aggregate here costs one extra round-trip
+ * but is robust to schema changes.
+ */
+export async function listPackagesWithStats(): Promise<PackageWithStats[]> {
+  const sb = await createClient();
+  const [{ data: pkgs, error: pkgErr }, { data: acts, error: actErr }] = await Promise.all([
+    sb.from('packages').select('*').limit(5000),
+    sb.from('activities').select('id,platform,poi,title,platform_product_id').limit(5000),
+  ]);
+  if (pkgErr) throw new Error(`packages: ${pkgErr.message}`);
+  if (actErr) throw new Error(`activities: ${actErr.message}`);
+  if (!pkgs || pkgs.length === 0) return [];
+
+  const actMap = new Map<number, { platform: Platform; poi: string | null; title: string | null; platform_product_id: string | null }>();
+  for (const a of acts ?? []) {
+    actMap.set(a.id, { platform: a.platform, poi: a.poi, title: a.title, platform_product_id: a.platform_product_id });
+  }
+
+  const { data: skus, error: skuErr } = await sb
+    .from('skus')
+    .select('package_id,price_usd,last_checked_at')
+    .limit(20000);
+  if (skuErr) throw new Error(`skus: ${skuErr.message}`);
+
+  type Agg = { count: number; min: number | null; max: number | null; last: string | null };
+  const agg = new Map<number, Agg>();
+  for (const s of skus ?? []) {
+    const a = agg.get(s.package_id) ?? { count: 0, min: null, max: null, last: null };
+    a.count++;
+    if (s.price_usd != null) {
+      if (a.min == null || s.price_usd < a.min) a.min = s.price_usd;
+      if (a.max == null || s.price_usd > a.max) a.max = s.price_usd;
+    }
+    if (s.last_checked_at && (!a.last || s.last_checked_at > a.last)) a.last = s.last_checked_at;
+    agg.set(s.package_id, a);
+  }
+
+  return pkgs.map((p) => {
+    const aRow = actMap.get(p.activity_id);
+    const a = agg.get(p.id) ?? { count: 0, min: null, max: null, last: null };
+    return {
+      id: p.id,
+      activity_id: p.activity_id,
+      platform: (aRow?.platform ?? 'klook') as Platform,
+      poi: aRow?.poi ?? null,
+      activity_title: aRow?.title ?? null,
+      platform_product_id: aRow?.platform_product_id ?? null,
+      package_title: p.title ?? null,
+      platform_package_id: p.platform_package_id ?? null,
+      tour_type: p.tour_type ?? null,
+      group_size: p.group_size ?? null,
+      meals: p.meals ?? null,
+      departure_city: p.departure_city ?? null,
+      available_languages: p.available_languages ?? null,
+      duration_minutes: p.duration_minutes ?? null,
+      sku_count: a.count,
+      min_price_usd: a.min,
+      max_price_usd: a.max,
+      last_checked_at: a.last,
+    };
+  });
+}
+
 export async function listSkusForActivity(activityId: number): Promise<SkuRow[]> {
   const pkgs = await listPackagesForActivity(activityId);
   if (pkgs.length === 0) return [];
