@@ -443,6 +443,7 @@ export async function cmdMatchFromUrl(opts: {
 export async function cmdIngestListing(opts: {
   file: string;
   noPricing?: boolean;
+  noDetail?: boolean;
   days?: number;
   format?: string;
 }): Promise<void> {
@@ -456,6 +457,7 @@ export async function cmdIngestListing(opts: {
   try {
     const result = await ingestFromListing(db, raw, {
       noPricing: opts.noPricing,
+      noDetail: opts.noDetail,
       days: opts.days,
     });
     if (opts.format === 'json') {

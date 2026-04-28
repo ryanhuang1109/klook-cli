@@ -490,16 +490,19 @@ toursCmd
   .description('Ingest a Listing JSON (per-POI per-platform filtered slice) and record coverage')
   .requiredOption('--file <path>', 'Path to a Listing JSON file (see src/tours/listing.ts for schema)')
   .option('--no-pricing', 'Only dedupe + log coverage; skip pricing/detail fetch for new IDs')
+  .option('--no-detail', 'Skip the detail fetch (supplier / cancellation / description); just run pricing')
   .option('--days <n>', 'Days of pricing matrix per new activity', '7')
   .option('-f, --format <fmt>', 'Output format: text, json', 'text')
-  .action(async (opts: { file: string; noPricing?: boolean; days?: string; pricing?: boolean; format?: string }) => {
+  .action(async (opts: { file: string; noPricing?: boolean; noDetail?: boolean; days?: string; pricing?: boolean; detail?: boolean; format?: string }) => {
     const { cmdIngestListing } = await import('./tours/commands.js');
     try {
-      // commander turns --no-pricing into opts.pricing === false
+      // commander turns --no-pricing / --no-detail into opts.pricing===false / opts.detail===false
       const noPricing = opts.pricing === false;
+      const noDetail = opts.detail === false;
       await cmdIngestListing({
         file: opts.file,
         noPricing,
+        noDetail,
         days: opts.days ? parseInt(opts.days) : undefined,
         format: opts.format,
       });

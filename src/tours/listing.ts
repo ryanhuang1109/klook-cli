@@ -15,7 +15,7 @@ import { z } from 'zod';
 import type { ToursDB } from './db.js';
 import { PlatformEnum } from './types.js';
 import type { Platform } from './types.js';
-import { ingestPricing } from './ingest.js';
+import { ingestPricing, ingestFromDetail } from './ingest.js';
 
 export const ListingActivitySchema = z.object({
   canonical_url: z.string().url(),
@@ -37,6 +37,8 @@ export type Listing = z.infer<typeof ListingSchema>;
 export interface IngestListingOptions {
   /** Skip pricing/detail fetch — just dedupe and log coverage. */
   noPricing?: boolean;
+  /** Skip the detail-level fetch (supplier / cancellation / description). */
+  noDetail?: boolean;
   /** Days of pricing matrix per new activity (default 7). */
   days?: number;
 }
@@ -80,6 +82,30 @@ export async function ingestFromListing(
       // bare id is fine for the rare case where the listing source omitted
       // the URL.
       const idForOpencli = a.canonical_url ?? a.platform_product_id;
+
+      // Run detail FIRST so the activity row gets supplier / cancellation_
+      // policy / description / order_count populated. Detail failure is
+      // non-fatal — pricing still runs and writes the activity row with
+      // whatever fields it can populate. Skip when --no-detail is passed.
+      if (!opts.noDetail) {
+        try {
+          await ingestFromDetail(db, {
+            platform: listing.platform,
+            activityId: idForOpencli,
+            poi: listing.poi,
+            canonicalUrl: a.canonical_url,
+            agentMode: 'none',
+          });
+        } catch (err) {
+          // Surface but don't bail — pricing path is the higher-value
+          // fetch and worth attempting even when detail flunked.
+          failures.push({
+            canonical_url: a.canonical_url,
+            reason: 'detail: ' + (err as Error).message.slice(0, 180),
+          });
+        }
+      }
+
       try {
         await ingestPricing(db, {
           platform: listing.platform,
@@ -92,7 +118,7 @@ export async function ingestFromListing(
       } catch (err) {
         failures.push({
           canonical_url: a.canonical_url,
-          reason: (err as Error).message.slice(0, 200),
+          reason: 'pricing: ' + (err as Error).message.slice(0, 180),
         });
       }
     }
