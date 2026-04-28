@@ -19,6 +19,42 @@ async function unwrap(promise, label) {
   return data;
 }
 
+/**
+ * Activities joined with package/sku counts and price aggregates from the
+ * v_activities_with_stats view (security_invoker=true, so RLS still gates
+ * which rows the caller sees).
+ */
+export async function listActivitiesWithStats(opts = {}) {
+  let q = sb.from('v_activities_with_stats')
+    .select('*')
+    .order('last_scraped_at', { ascending: false })
+    .limit(opts.limit ?? 500);
+  if (opts.poi) q = q.ilike('poi', `%${opts.poi}%`);
+  if (opts.platform) q = q.eq('platform', opts.platform);
+  if (opts.search) q = q.ilike('title', `%${opts.search}%`);
+  return unwrap(q, 'listActivitiesWithStats');
+}
+
+export async function listPackagesForActivity(activityId) {
+  return unwrap(
+    sb.from('packages').select('*').eq('activity_id', activityId).order('id'),
+    'listPackagesForActivity',
+  );
+}
+
+export async function listSkusForActivity(activityId) {
+  // Two-hop join via packages — Supabase JS doesn't support multi-table
+  // joins in the embedded form when you don't own the relationship name,
+  // so fetch packages first and filter SKUs by their ids.
+  const pkgs = await listPackagesForActivity(activityId);
+  if (pkgs.length === 0) return [];
+  const ids = pkgs.map((p) => p.id);
+  return unwrap(
+    sb.from('skus').select('*').in('package_id', ids).order('travel_date'),
+    'listSkusForActivity',
+  );
+}
+
 export async function listActivities(opts = {}) {
   let q = sb.from('activities')
     .select('id,platform,platform_product_id,canonical_url,title,poi,supplier,rating,review_count,last_scraped_at,review_status')

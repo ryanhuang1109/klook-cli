@@ -14,6 +14,7 @@
 import { requireSession, getUser, signOut, isAdmin } from '/auth.js';
 
 const NAV = [
+  { href: '/activities.html', label: 'Activities', key: 'activities' },
   { href: '/coverage.html', label: 'Coverage', key: 'coverage' },
   { href: '/runs.html', label: 'Runs', key: 'runs' },
   { href: '/executions.html', label: 'Executions', key: 'executions' },

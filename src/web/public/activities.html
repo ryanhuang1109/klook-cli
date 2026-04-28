@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activities — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">Activities</h1>
+        <p class="text-sm text-gray-600">Everything we have ingested — activities with their packages, SKUs, and price ranges. Click a row to expand the package &amp; SKU detail.</p>
+      </div>
+      <div class="flex items-center gap-2 text-sm flex-wrap">
+        <input id="search" type="text" placeholder="Search title…"
+               class="border border-gray-300 rounded px-3 py-1.5 text-sm w-48" />
+        <select id="poi" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <option value="">All POIs</option>
+        </select>
+        <select id="platform" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <option value="">All platforms</option>
+          <option value="klook">klook</option>
+          <option value="trip">trip</option>
+          <option value="getyourguide">gyg</option>
+          <option value="kkday">kkday</option>
+          <option value="airbnb">airbnb</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="summary" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4"></div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="px-3 py-2 w-6"></th>
+            <th class="text-left px-3 py-2">Platform</th>
+            <th class="text-left px-3 py-2">POI</th>
+            <th class="text-left px-3 py-2">Title</th>
+            <th class="text-right px-3 py-2">★</th>
+            <th class="text-right px-3 py-2">Reviews</th>
+            <th class="text-right px-3 py-2">Pkg</th>
+            <th class="text-right px-3 py-2">SKU</th>
+            <th class="text-right px-3 py-2">Price USD</th>
+            <th class="text-left px-3 py-2">Last scraped</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    import { listActivitiesWithStats, listPackagesForActivity, listSkusForActivity } from '/supabase-data.js';
+
+    await mountLayout({ active: 'activities' });
+
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v;
+        else if (k === 'text') n.textContent = v;
+        else if (k === 'on') {
+          for (const [ev, h] of Object.entries(v)) n.addEventListener(ev, h);
+        }
+        else if (v != null) n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    }
+
+    function fmtNum(n) { return n == null ? '—' : Number(n).toLocaleString(); }
+    function fmtUsd(n) { return n == null ? '—' : `$${Number(n).toFixed(2)}`; }
+    function fmtDate(iso) { return iso ? iso.replace('T', ' ').slice(0, 16) : '—'; }
+    function platformBadge(p) {
+      const tone = {
+        klook: 'bg-orange-100 text-orange-800',
+        trip: 'bg-blue-100 text-blue-800',
+        getyourguide: 'bg-pink-100 text-pink-800',
+        kkday: 'bg-green-100 text-green-800',
+        airbnb: 'bg-rose-100 text-rose-700',
+      }[p] || 'bg-gray-100 text-gray-700';
+      return el('span', { class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${tone}`, text: p });
+    }
+
+    let allRows = [];
+    let expanded = new Set();
+    const tbody = document.getElementById('rows');
+    const poiSelect = document.getElementById('poi');
+
+    function renderSummary(rows) {
+      const summary = document.getElementById('summary');
+      summary.replaceChildren();
+      const totals = {
+        activities: rows.length,
+        packages: rows.reduce((a, r) => a + (r.package_count ?? 0), 0),
+        skus: rows.reduce((a, r) => a + (r.sku_count ?? 0), 0),
+        platforms: new Set(rows.map((r) => r.platform)).size,
+        pois: new Set(rows.filter((r) => r.poi).map((r) => r.poi.toLowerCase())).size,
+      };
+      const card = (label, val) => el('div', { class: 'bg-white border border-gray-200 rounded-lg px-3 py-2.5' }, [
+        el('div', { class: 'text-xs text-gray-500 uppercase tracking-wide', text: label }),
+        el('div', { class: 'text-xl font-bold tabular-nums mt-0.5', text: String(val) }),
+      ]);
+      summary.appendChild(card('Activities', totals.activities));
+      summary.appendChild(card('Packages', totals.packages));
+      summary.appendChild(card('SKUs', totals.skus));
+      summary.appendChild(card('Platforms', totals.platforms));
+      summary.appendChild(card('POIs', totals.pois));
+    }
+
+    async function renderTable() {
+      const search = document.getElementById('search').value.trim().toLowerCase();
+      const poi = poiSelect.value;
+      const plat = document.getElementById('platform').value;
+
+      let rows = allRows;
+      if (poi) rows = rows.filter((r) => (r.poi ?? '').toLowerCase() === poi.toLowerCase());
+      if (plat) rows = rows.filter((r) => r.platform === plat);
+      if (search) rows = rows.filter((r) => (r.title ?? '').toLowerCase().includes(search));
+
+      renderSummary(rows);
+      tbody.replaceChildren();
+      if (rows.length === 0) {
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '10', text: 'No activities match the filter.' }),
+        ]));
+        return;
+      }
+
+      for (const r of rows) {
+        const isOpen = expanded.has(r.id);
+        const priceText = r.min_price_usd == null
+          ? '—'
+          : r.min_price_usd === r.max_price_usd
+            ? fmtUsd(r.min_price_usd)
+            : `${fmtUsd(r.min_price_usd)} – ${fmtUsd(r.max_price_usd)}`;
+
+        const titleCell = el('td', { class: 'px-3 py-2 max-w-md' }, [
+          el('div', { class: 'truncate', title: r.title || '', text: r.title || '(untitled)' }),
+          el('a', {
+            href: r.canonical_url,
+            target: '_blank',
+            rel: 'noopener',
+            class: 'text-xs text-gray-400 hover:text-blue-600 hover:underline truncate block',
+            title: r.canonical_url,
+            text: r.canonical_url,
+          }),
+        ]);
+
+        const tr = el('tr', { class: `border-t border-gray-100 hover:bg-gray-50 cursor-pointer ${isOpen ? 'bg-gray-50' : ''}` }, [
+          el('td', { class: 'px-3 py-2 text-gray-400 text-center', text: isOpen ? '▾' : '▸' }),
+          el('td', { class: 'px-3 py-2' }, [platformBadge(r.platform)]),
+          el('td', { class: 'px-3 py-2', text: r.poi || '—' }),
+          titleCell,
+          el('td', { class: 'px-3 py-2 text-right tabular-nums', text: r.rating == null ? '—' : Number(r.rating).toFixed(1) }),
+          el('td', { class: 'px-3 py-2 text-right tabular-nums text-gray-600', text: fmtNum(r.review_count) }),
+          el('td', { class: 'px-3 py-2 text-right tabular-nums', text: String(r.package_count ?? 0) }),
+          el('td', { class: 'px-3 py-2 text-right tabular-nums', text: String(r.sku_count ?? 0) }),
+          el('td', { class: 'px-3 py-2 text-right tabular-nums font-medium', text: priceText }),
+          el('td', { class: 'px-3 py-2 text-xs font-mono text-gray-500', text: fmtDate(r.last_scraped_at) }),
+        ]);
+        tr.addEventListener('click', (ev) => {
+          if (ev.target.tagName === 'A') return;
+          if (expanded.has(r.id)) expanded.delete(r.id); else expanded.add(r.id);
+          renderTable();
+        });
+        tbody.appendChild(tr);
+
+        if (isOpen) {
+          const detail = el('tr', {}, [
+            el('td', { class: 'px-3 py-3', colspan: '10' }, [
+              await renderDetail(r.id),
+            ]),
+          ]);
+          detail.firstChild.classList.add('bg-gray-50');
+          tbody.appendChild(detail);
+        }
+      }
+    }
+
+    async function renderDetail(activityId) {
+      const wrap = el('div', { class: 'pl-8 pr-4' });
+      try {
+        const [pkgs, skus] = await Promise.all([
+          listPackagesForActivity(activityId),
+          listSkusForActivity(activityId),
+        ]);
+        if (pkgs.length === 0) {
+          wrap.appendChild(el('div', { class: 'text-xs text-gray-500 italic', text: 'No packages — pricing run produced no rows for this activity (see Executions for diagnosis).' }));
+          return wrap;
+        }
+        const skusByPkg = new Map();
+        for (const s of skus) {
+          if (!skusByPkg.has(s.package_id)) skusByPkg.set(s.package_id, []);
+          skusByPkg.get(s.package_id).push(s);
+        }
+
+        for (const pkg of pkgs) {
+          const block = el('div', { class: 'mb-3 last:mb-0' });
+          const header = el('div', { class: 'flex items-center gap-2 text-sm mb-1' }, [
+            el('span', { class: 'font-medium', text: pkg.title || '(untitled)' }),
+            el('span', { class: 'text-xs text-gray-500', text: `· ${pkg.tour_type ?? '—'} · ${pkg.group_size ?? '—'}` }),
+          ]);
+          block.appendChild(header);
+
+          const pkgSkus = (skusByPkg.get(pkg.id) ?? []).sort((a, b) => (a.travel_date || '').localeCompare(b.travel_date || ''));
+          if (pkgSkus.length === 0) {
+            block.appendChild(el('div', { class: 'text-xs text-gray-500 italic', text: 'No SKUs.' }));
+          } else {
+            const grid = el('div', { class: 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2' });
+            for (const s of pkgSkus) {
+              const tone = !s.available
+                ? 'bg-gray-100 text-gray-400 line-through'
+                : 'bg-white border border-gray-200';
+              const cell = el('div', { class: `${tone} rounded px-2 py-1.5 text-xs` }, [
+                el('div', { class: 'text-gray-500', text: s.travel_date }),
+                el('div', { class: 'font-mono font-medium', text: s.price_usd != null ? `$${Number(s.price_usd).toFixed(2)}` : (s.price_local != null ? `${s.price_local} ${s.currency || ''}` : '—') }),
+              ]);
+              grid.appendChild(cell);
+            }
+            block.appendChild(grid);
+          }
+          wrap.appendChild(block);
+        }
+      } catch (err) {
+        wrap.appendChild(el('div', { class: 'text-xs text-red-600', text: 'Error: ' + err.message }));
+      }
+      return wrap;
+    }
+
+    function populatePOIs() {
+      const pois = [...new Set(allRows.map((r) => r.poi).filter(Boolean))].sort();
+      for (const p of pois) {
+        poiSelect.appendChild(el('option', { value: p, text: p }));
+      }
+    }
+
+    async function load() {
+      try {
+        allRows = await listActivitiesWithStats({ limit: 500 });
+        populatePOIs();
+        await renderTable();
+      } catch (err) {
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-red-600', colspan: '10', text: 'Error: ' + err.message }),
+        ]));
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', renderTable);
+    document.getElementById('poi').addEventListener('change', renderTable);
+    document.getElementById('platform').addEventListener('change', renderTable);
+    load();
+  </script>
+</body>
+</html>

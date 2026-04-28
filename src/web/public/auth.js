@@ -88,7 +88,7 @@ export async function signInWithGoogle() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: location.origin + (new URLSearchParams(location.search).get('next') || '/coverage.html'),
+      redirectTo: location.origin + (new URLSearchParams(location.search).get('next') || '/activities.html'),
     },
   });
   if (error) throw error;
