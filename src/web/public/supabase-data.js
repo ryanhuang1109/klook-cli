@@ -83,6 +83,26 @@ export async function listExecutions(opts = {}) {
   return unwrap(q, 'listExecutions');
 }
 
+/**
+ * Executions whose `started_at` falls inside [from, to] for a given
+ * platform. Used by /runs.html to associate coverage_runs / search_runs
+ * with the executions that ran around the same time — there's no FK,
+ * but a ±N-minute window scoped to a single platform is reliable enough
+ * for a deep-dive view.
+ */
+export async function listExecutionsInWindow(platform, fromIso, toIso) {
+  return unwrap(
+    sb.from('execution_logs')
+      .select('*')
+      .eq('platform', platform)
+      .gte('started_at', fromIso)
+      .lte('started_at', toIso)
+      .order('started_at', { ascending: true })
+      .limit(500),
+    'listExecutionsInWindow',
+  );
+}
+
 export async function listSearchRuns(limit = 100) {
   return unwrap(
     sb.from('search_runs').select('*').order('run_at', { ascending: false }).limit(limit),

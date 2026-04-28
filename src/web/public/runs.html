@@ -5,21 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Runs — klook-cli</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    body.modal-open { overflow: hidden; }
+  </style>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen">
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
     <div class="mb-4">
       <h1 class="text-2xl font-bold">Runs</h1>
-      <p class="text-sm text-gray-600">Three streams of activity, newest first: tour sessions, listing-coverage runs, and search-based ingest runs.</p>
+      <p class="text-sm text-gray-600">Three streams of activity, newest first. Click a row to deep-dive into the per-activity executions that ran for it.</p>
     </div>
 
     <div id="counts" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
 
     <section class="mb-8">
       <h2 class="text-lg font-semibold mb-2">Run sessions <span id="sess-count" class="text-sm text-gray-400 font-normal"></span></h2>
-      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table class="w-full text-sm">
+      <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+        <table class="w-full text-sm min-w-[800px]">
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="text-left px-4 py-2">Started</th>
@@ -37,8 +40,8 @@
 
     <section class="mb-8">
       <h2 class="text-lg font-semibold mb-2">Coverage runs (listing → ingest) <span id="cov-count" class="text-sm text-gray-400 font-normal"></span></h2>
-      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table class="w-full text-sm">
+      <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+        <table class="w-full text-sm min-w-[900px]">
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="text-left px-4 py-2">Run at</th>
@@ -57,8 +60,8 @@
 
     <section>
       <h2 class="text-lg font-semibold mb-2">Search runs <span id="srch-count" class="text-sm text-gray-400 font-normal"></span></h2>
-      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table class="w-full text-sm">
+      <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+        <table class="w-full text-sm min-w-[800px]">
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="text-left px-4 py-2">Run at</th>
@@ -76,26 +79,42 @@
     </section>
   </main>
 
+  <!-- Deepdive modal -->
+  <div id="modal-backdrop" class="hidden fixed inset-0 bg-black/40 z-40"></div>
+  <div id="modal" class="hidden fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-4">
+      <div class="flex items-start justify-between gap-4 p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
+        <div id="modal-header" class="min-w-0 flex-1"></div>
+        <button id="modal-close" type="button"
+                class="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2 -mr-2"
+                aria-label="Close">×</button>
+      </div>
+      <div id="modal-body" class="p-5 space-y-4"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { mountLayout } from '/_layout.js';
-    import { listSessions, listCoverageRuns, listSearchRuns, tableCounts } from '/supabase-data.js';
+    import { listSessions, listCoverageRuns, listSearchRuns, tableCounts, listExecutions, listExecutionsInWindow } from '/supabase-data.js';
 
-    mountLayout({ active: 'runs' });
+    await mountLayout({ active: 'runs' });
 
     function el(tag, attrs = {}, children = []) {
       const n = document.createElement(tag);
       for (const [k, v] of Object.entries(attrs)) {
         if (k === 'class') n.className = v;
         else if (k === 'text') n.textContent = v;
-        else n.setAttribute(k, v);
+        else if (k === 'on') {
+          for (const [ev, h] of Object.entries(v)) n.addEventListener(ev, h);
+        }
+        else if (v != null && v !== false) n.setAttribute(k, v === true ? '' : v);
       }
-      for (const c of children) n.appendChild(c);
+      for (const c of children) if (c) n.appendChild(c);
       return n;
     }
 
-    function fmt(iso) {
-      return iso ? new Date(iso).toISOString().slice(0, 19).replace('T', ' ') : '—';
-    }
+    const fmt = (iso) => iso ? new Date(iso).toISOString().slice(0, 19).replace('T', ' ') : '—';
+    const fmtDur = (ms) => ms ? `${(ms / 1000).toFixed(1)}s` : '—';
 
     function statusBadge(status) {
       const tone = status === 'done' ? 'bg-green-100 text-green-800'
@@ -105,6 +124,200 @@
       return el('span', { class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${tone}`, text: status });
     }
 
+    function strategyBadge(s) {
+      const tone = s === 'opencli-pricing' ? 'bg-blue-100 text-blue-800'
+                 : s === 'opencli-detail' ? 'bg-indigo-100 text-indigo-800'
+                 : s === 'opencli-search' ? 'bg-purple-100 text-purple-800'
+                 : s === 'agent-browser-fallback' ? 'bg-amber-100 text-amber-800'
+                 : s === 'snapshot' ? 'bg-gray-200 text-gray-700'
+                 : 'bg-gray-100 text-gray-600';
+      return el('span', { class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${tone}`, text: s });
+    }
+
+    function resultBadge(succeeded) {
+      const ok = succeeded === 1 || succeeded === true;
+      return el('span', {
+        class: `inline-block px-2 py-0.5 rounded text-xs font-medium ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}`,
+        text: ok ? 'OK' : 'FAIL',
+      });
+    }
+
+    // ─── Modal ──────────────────────────────────────────────────────────
+    const modal = document.getElementById('modal');
+    const backdrop = document.getElementById('modal-backdrop');
+    const modalHeader = document.getElementById('modal-header');
+    const modalBody = document.getElementById('modal-body');
+
+    function showModal() {
+      document.body.classList.add('modal-open');
+      modal.classList.remove('hidden');
+      backdrop.classList.remove('hidden');
+    }
+    function closeModal() {
+      modal.classList.add('hidden');
+      backdrop.classList.add('hidden');
+      document.body.classList.remove('modal-open');
+      modalHeader.replaceChildren();
+      modalBody.replaceChildren();
+    }
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+
+    function renderHeader(kind, attrs) {
+      const wrap = el('div');
+      wrap.appendChild(el('div', { class: 'text-xs uppercase tracking-wide text-gray-500 mb-1', text: kind }));
+      const grid = el('dl', { class: 'grid grid-cols-2 md:grid-cols-3 gap-y-1 gap-x-6 text-sm' });
+      for (const [k, v] of attrs) {
+        grid.appendChild(el('dt', { class: 'text-xs text-gray-500', text: k }));
+        grid.appendChild(el('dd', { class: 'font-medium break-words', text: v == null || v === '' ? '—' : String(v) }));
+      }
+      wrap.appendChild(grid);
+      return wrap;
+    }
+
+    function execTable(execs, opts = {}) {
+      const wrap = el('div');
+      wrap.appendChild(el('h3', { class: 'text-sm font-semibold mt-2 mb-2', text: opts.title || 'Executions' }));
+      if (opts.note) {
+        wrap.appendChild(el('div', { class: 'text-xs text-gray-500 italic mb-2', text: opts.note }));
+      }
+      if (!execs.length) {
+        wrap.appendChild(el('div', { class: 'text-sm text-gray-500 italic py-3 px-4 bg-gray-50 rounded', text: 'No matching executions in this window.' }));
+        return wrap;
+      }
+      // Summary line
+      const ok = execs.filter((e) => e.succeeded === 1 || e.succeeded === true).length;
+      const fb = execs.filter((e) => e.strategy === 'agent-browser-fallback').length;
+      const pkg = execs.reduce((a, e) => a + (e.packages_written ?? 0), 0);
+      const sku = execs.reduce((a, e) => a + (e.skus_written ?? 0), 0);
+      wrap.appendChild(el('div', { class: 'text-xs text-gray-600 mb-2' },
+        [el('span', { text: `${execs.length} total · ${ok} ok · ${execs.length - ok} fail · ${fb} fallback · ${pkg} pkg · ${sku} sku` })]));
+
+      const tbl = el('table', { class: 'w-full text-sm border border-gray-200 rounded' });
+      tbl.appendChild(el('thead', { class: 'bg-gray-50' }, [
+        el('tr', {}, [
+          el('th', { class: 'text-left px-3 py-2 text-xs uppercase tracking-wide text-gray-500', text: 'Started' }),
+          el('th', { class: 'text-left px-3 py-2 text-xs uppercase tracking-wide text-gray-500', text: 'Activity' }),
+          el('th', { class: 'text-left px-3 py-2 text-xs uppercase tracking-wide text-gray-500', text: 'Strategy' }),
+          el('th', { class: 'text-right px-3 py-2 text-xs uppercase tracking-wide text-gray-500', text: 'Dur' }),
+          el('th', { class: 'text-right px-3 py-2 text-xs uppercase tracking-wide text-gray-500', text: 'Pkg / SKU' }),
+          el('th', { class: 'text-left px-3 py-2 text-xs uppercase tracking-wide text-gray-500', text: 'Result' }),
+        ]),
+      ]));
+      const tbody = el('tbody');
+      for (const e of execs) {
+        const row = el('tr', { class: 'border-t border-gray-100 align-top' }, [
+          el('td', { class: 'px-3 py-2 text-xs font-mono text-gray-500 whitespace-nowrap', text: fmt(e.started_at) }),
+          el('td', { class: 'px-3 py-2 font-mono text-xs', text: e.activity_id }),
+          el('td', { class: 'px-3 py-2' }, [strategyBadge(e.strategy)]),
+          el('td', { class: 'px-3 py-2 text-right tabular-nums text-gray-600', text: fmtDur(e.duration_ms) }),
+          el('td', { class: 'px-3 py-2 text-right tabular-nums text-xs', text: `${e.packages_written ?? 0} / ${e.skus_written ?? 0}` }),
+          el('td', { class: 'px-3 py-2' }, [resultBadge(e.succeeded)]),
+        ]);
+        tbody.appendChild(row);
+        if (!(e.succeeded === 1 || e.succeeded === true) && e.error_message) {
+          tbody.appendChild(el('tr', { class: 'bg-red-50' }, [
+            el('td'),
+            el('td', { class: 'px-3 py-2 text-xs text-red-800 whitespace-pre-wrap break-words font-mono', colspan: '5', text: e.error_message }),
+          ]));
+        }
+        if (e.fallback_reason) {
+          tbody.appendChild(el('tr', { class: 'bg-amber-50' }, [
+            el('td'),
+            el('td', { class: 'px-3 py-2 text-xs text-amber-800 whitespace-pre-wrap break-words font-mono', colspan: '5', text: 'fallback: ' + e.fallback_reason }),
+          ]));
+        }
+      }
+      tbl.appendChild(tbody);
+      wrap.appendChild(tbl);
+      return wrap;
+    }
+
+    async function openSessionModal(s) {
+      let comp = s.competitors;
+      try { comp = JSON.parse(comp); } catch {}
+      if (Array.isArray(comp)) comp = comp.join(', ');
+      modalHeader.replaceChildren(renderHeader('Run session', [
+        ['Started', fmt(s.started_at)],
+        ['Finished', fmt(s.finished_at)],
+        ['POI', s.poi],
+        ['Keyword', s.keyword],
+        ['Destination', s.destination],
+        ['Competitors', comp],
+        ['Limit / platform', s.limit_per_platform],
+        ['Status', s.status],
+      ]));
+      modalBody.replaceChildren(el('div', { class: 'text-sm text-gray-500', text: 'Loading executions…' }));
+      showModal();
+      try {
+        const execs = await listExecutions({ sessionId: s.id, limit: 500 });
+        modalBody.replaceChildren(execTable(execs, { title: `Executions linked to this session (FK match)` }));
+      } catch (err) {
+        modalBody.replaceChildren(el('div', { class: 'text-sm text-red-600', text: 'Error: ' + err.message }));
+      }
+    }
+
+    async function openCoverageModal(r) {
+      modalHeader.replaceChildren(renderHeader('Coverage run', [
+        ['Run at', fmt(r.run_at)],
+        ['POI', r.poi],
+        ['Platform', r.platform],
+        ['Filter signature', r.filter_signature],
+        ['Fetched', r.fetched],
+        ['New unique', r.new_unique],
+        ['Total reported', r.total_reported ?? '—'],
+      ]));
+      modalBody.replaceChildren(el('div', { class: 'text-sm text-gray-500', text: 'Loading executions in window…' }));
+      showModal();
+      try {
+        // Listing-driven ingest: executions happen BEFORE the coverage_runs
+        // row is written. Look back 1 hour, forward 5 min for clock skew.
+        const t = new Date(r.run_at).getTime();
+        const from = new Date(t - 60 * 60 * 1000).toISOString();
+        const to   = new Date(t +  5 * 60 * 1000).toISOString();
+        const execs = await listExecutionsInWindow(r.platform, from, to);
+        modalBody.replaceChildren(execTable(execs, {
+          title: 'Executions in time window',
+          note: `Heuristic match: ${r.platform} executions in [run_at − 1h, run_at + 5m]. There's no FK between coverage_runs and execution_logs, so this can include unrelated runs from the same window.`,
+        }));
+      } catch (err) {
+        modalBody.replaceChildren(el('div', { class: 'text-sm text-red-600', text: 'Error: ' + err.message }));
+      }
+    }
+
+    async function openSearchRunModal(r) {
+      modalHeader.replaceChildren(renderHeader('Search run', [
+        ['Run at', fmt(r.run_at)],
+        ['Platform', r.platform],
+        ['Keyword', r.keyword],
+        ['POI', r.poi],
+        ['Found', r.total_found],
+        ['Ingested', r.ingested],
+        ['Succeeded', r.succeeded],
+        ['Failed', r.failed],
+      ]));
+      modalBody.replaceChildren(el('div', { class: 'text-sm text-gray-500', text: 'Loading executions in window…' }));
+      showModal();
+      try {
+        // search-driven ingest: pricing executions happen AFTER the search
+        // returns. Look forward up to 1 hour, back 5 min for clock skew.
+        const t = new Date(r.run_at).getTime();
+        const from = new Date(t -  5 * 60 * 1000).toISOString();
+        const to   = new Date(t + 60 * 60 * 1000).toISOString();
+        const execs = await listExecutionsInWindow(r.platform, from, to);
+        modalBody.replaceChildren(execTable(execs, {
+          title: 'Executions in time window',
+          note: `Heuristic match: ${r.platform} executions in [run_at − 5m, run_at + 1h]. search_runs has no direct FK to execution_logs.`,
+        }));
+      } catch (err) {
+        modalBody.replaceChildren(el('div', { class: 'text-sm text-red-600', text: 'Error: ' + err.message }));
+      }
+    }
+
+    // ─── Top counts cards ───────────────────────────────────────────────
     async function loadCounts() {
       try {
         const counts = await tableCounts();
@@ -124,6 +337,7 @@
       } catch {}
     }
 
+    // ─── Three streams ──────────────────────────────────────────────────
     async function loadSessions() {
       const rows = await listSessions(20);
       document.getElementById('sess-count').textContent = `(${rows.length})`;
@@ -132,14 +346,16 @@
         let comp = s.competitors;
         try { comp = JSON.parse(comp); } catch {}
         if (Array.isArray(comp)) comp = comp.join(', ');
-        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
-          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(s.started_at) }),
+        const tr = el('tr', { class: 'border-t border-gray-100 hover:bg-gray-50 cursor-pointer' }, [
+          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500 whitespace-nowrap', text: fmt(s.started_at) }),
           el('td', { class: 'px-4 py-2', text: s.poi || '—' }),
           el('td', { class: 'px-4 py-2 text-gray-600', text: s.keyword || '—' }),
           el('td', { class: 'px-4 py-2 text-gray-600 text-xs', text: comp || '—' }),
           el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(s.limit_per_platform ?? '—') }),
           el('td', { class: 'px-4 py-2' }, [statusBadge(s.status)]),
-        ]));
+        ]);
+        tr.addEventListener('click', () => openSessionModal(s));
+        tbody.appendChild(tr);
       }
     }
 
@@ -148,15 +364,17 @@
       document.getElementById('cov-count').textContent = `(${rows.length})`;
       const tbody = document.getElementById('cov-rows');
       for (const r of rows) {
-        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
-          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(r.run_at) }),
+        const tr = el('tr', { class: 'border-t border-gray-100 hover:bg-gray-50 cursor-pointer' }, [
+          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500 whitespace-nowrap', text: fmt(r.run_at) }),
           el('td', { class: 'px-4 py-2', text: r.poi }),
           el('td', { class: 'px-4 py-2 text-gray-700', text: r.platform }),
           el('td', { class: 'px-4 py-2 text-xs text-gray-500 font-mono', text: r.filter_signature }),
           el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(r.fetched) }),
           el('td', { class: 'px-4 py-2 text-right tabular-nums font-medium', text: String(r.new_unique) }),
           el('td', { class: 'px-4 py-2 text-right tabular-nums text-gray-500', text: r.total_reported == null ? '—' : String(r.total_reported) }),
-        ]));
+        ]);
+        tr.addEventListener('click', () => openCoverageModal(r));
+        tbody.appendChild(tr);
       }
     }
 
@@ -165,16 +383,17 @@
       document.getElementById('srch-count').textContent = `(${rows.length})`;
       const tbody = document.getElementById('srch-rows');
       for (const r of rows) {
-        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [
-          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500', text: fmt(r.run_at) }),
+        const tr = el('tr', { class: 'border-t border-gray-100 hover:bg-gray-50 cursor-pointer' }, [
+          el('td', { class: 'px-4 py-2 text-xs font-mono text-gray-500 whitespace-nowrap', text: fmt(r.run_at) }),
           el('td', { class: 'px-4 py-2 text-gray-700', text: r.platform }),
           el('td', { class: 'px-4 py-2 text-gray-600', text: r.keyword }),
           el('td', { class: 'px-4 py-2', text: r.poi }),
           el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(r.total_found) }),
           el('td', { class: 'px-4 py-2 text-right tabular-nums', text: String(r.ingested) }),
-          el('td', { class: 'px-4 py-2 text-right tabular-nums text-xs',
-                    text: `${r.succeeded} / ${r.failed}` }),
-        ]));
+          el('td', { class: 'px-4 py-2 text-right tabular-nums text-xs', text: `${r.succeeded} / ${r.failed}` }),
+        ]);
+        tr.addEventListener('click', () => openSearchRunModal(r));
+        tbody.appendChild(tr);
       }
     }
 
