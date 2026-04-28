@@ -28,18 +28,18 @@ export function ActivitiesTable({ rows }: { rows: ActivityRow[] }) {
   return (
     <>
       <div className="rounded-xl border border-zinc-200/80 bg-white overflow-hidden">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50">
               <TableHead className="w-[88px]">Platform</TableHead>
-              <TableHead className="w-[140px]">POI</TableHead>
+              <TableHead className="w-[120px]">POI</TableHead>
               <TableHead>Title</TableHead>
-              <TableHead className="w-[180px]">Supplier</TableHead>
-              <TableHead className="w-[72px] text-right">Rating</TableHead>
-              <TableHead className="w-[88px] text-right">Reviews</TableHead>
-              <TableHead className="w-[88px] text-right">Orders</TableHead>
-              <TableHead className="w-[60px] text-right">Pkg</TableHead>
-              <TableHead className="w-[60px] text-right">SKU</TableHead>
+              <TableHead className="w-[160px]">Supplier</TableHead>
+              <TableHead className="w-[64px] text-right">Rating</TableHead>
+              <TableHead className="w-[80px] text-right">Reviews</TableHead>
+              <TableHead className="w-[80px] text-right">Orders</TableHead>
+              <TableHead className="w-[56px] text-right">Pkg</TableHead>
+              <TableHead className="w-[56px] text-right">SKU</TableHead>
               <TableHead className="w-[140px] text-right">Price USD</TableHead>
               <TableHead className="w-[100px] text-right">Last</TableHead>
             </TableRow>
@@ -55,8 +55,8 @@ export function ActivitiesTable({ rows }: { rows: ActivityRow[] }) {
                 <TableCell className="text-zinc-700 truncate" title={r.poi ?? ''}>
                   {r.poi ?? '—'}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <TableCell className="overflow-hidden">
+                  <div className="flex items-center gap-2.5 min-w-0 w-full">
                     {r.cover_image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -73,7 +73,7 @@ export function ActivitiesTable({ rows }: { rows: ActivityRow[] }) {
                       <div className="truncate font-medium" title={r.title ?? ''}>
                         {r.title ?? '(untitled)'}
                       </div>
-                      <div className="truncate text-xs text-zinc-400 font-mono">
+                      <div className="truncate text-xs text-zinc-400 font-mono" title={r.platform_product_id ?? ''}>
                         {r.platform_product_id ?? ''}
                       </div>
                     </div>
