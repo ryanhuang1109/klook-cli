@@ -54,10 +54,22 @@
     mountLayout({ active: 'tours' });
   </script>
   <h1>Tours Pipeline</h1>
+  <noscript><style>#run-form-card { display: none; }</style></noscript>
+  <script>
+    // The "Run now" form posts to a local Express endpoint that doesn't
+    // exist on Vercel. Hide the form when not on localhost so the
+    // production page is read-only.
+    if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      document.documentElement.dataset.readonly = '1';
+      const css = document.createElement('style');
+      css.textContent = `[data-readonly="1"] #run-form-card { display: none; }`;
+      document.head.appendChild(css);
+    }
+  </script>
   <div class="sub">Trigger a cross-platform competitor scan. Results land in
     <code>data/reports/latest.html</code> and the DB.</div>
 
-  <div class="card">
+  <div class="card" id="run-form-card">
     <form id="run-form">
       <div class="row">
         <div>
@@ -124,7 +136,9 @@
     </p>
   </div>
 
-<script>
+<script type="module">
+import { listSessions } from '/supabase-data.js';
+
 // Chip toggle behaviour
 for (const label of document.querySelectorAll('#competitors label')) {
   const cb = label.querySelector('input');
@@ -141,23 +155,26 @@ function cell(text, className) {
   return td;
 }
 
-// Prefer the Express API when available (local dev). Fall back to the
-// static /routine-state.json that `npm run vercel:prepare` writes at
-// build time — that's what Vercel serves.
+// Sessions come from Supabase (live), config + host come from
+// /routine-state.json (build-time snapshot of the cron-running machine's
+// state — Vercel doesn't run cron itself). The two sources are independent
+// so we treat their failures independently.
 async function fetchState() {
+  let sessions = [];
   try {
-    const api = await fetch('/api/tours/sessions?limit=15');
-    if (api.ok) {
-      const sessions = await api.json();
-      let state = null;
-      try { state = await (await fetch('/routine-state.json')).json(); } catch (_e) {}
-      return { sessions, config: state && state.config, host: state && state.host, source: 'live' };
-    }
-  } catch (_e) { /* fall through */ }
-  const res = await fetch('/routine-state.json');
-  if (!res.ok) throw new Error('routine-state.json not available');
-  const state = await res.json();
-  return { sessions: state.sessions || [], config: state.config, host: state.host, source: 'static', generated_at: state.generated_at };
+    sessions = await listSessions(15);
+  } catch (e) {
+    console.error('Supabase listSessions failed', e);
+  }
+  let state = null;
+  try { state = await (await fetch('/routine-state.json')).json(); } catch (_e) {}
+  return {
+    sessions,
+    config: state && state.config,
+    host: state && state.host,
+    source: state ? 'live+static' : 'live',
+    generated_at: state && state.generated_at,
+  };
 }
 
 function fmtDate(s) {

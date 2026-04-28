@@ -11,7 +11,7 @@
  * from external data later.
  */
 
-import { requireSession, getUser, signOut } from '/auth.js';
+import { requireSession, getUser, signOut, isAdmin } from '/auth.js';
 
 const NAV = [
   { href: '/dashboard.html', label: 'POI Compare', key: 'dashboard' },
@@ -20,6 +20,10 @@ const NAV = [
   { href: '/runs.html', label: 'Runs', key: 'runs' },
   { href: '/executions.html', label: 'Executions', key: 'executions' },
   { href: '/cron.html', label: 'Cron', key: 'cron' },
+];
+
+const ADMIN_NAV = [
+  { href: '/whitelist.html', label: 'Whitelist', key: 'whitelist' },
 ];
 
 function el(tag, attrs = {}, children = []) {
@@ -56,7 +60,9 @@ export async function mountLayout({ active }) {
   ]);
 
   const nav = el('nav', { class: 'flex items-center gap-1 overflow-x-auto -mx-1 px-1 flex-1' });
-  for (const n of NAV) {
+  const userIsAdmin = await isAdmin().catch(() => false);
+  const links = [...NAV, ...(userIsAdmin ? ADMIN_NAV : [])];
+  for (const n of links) {
     const isActive = n.key === active;
     const link = el('a', {
       href: n.href,

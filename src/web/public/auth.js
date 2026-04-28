@@ -40,6 +40,33 @@ export async function getUser() {
   return session?.user ?? null;
 }
 
+let _adminCache = null;
+
+/**
+ * Whether the current user is in the email_whitelist with is_admin=true.
+ * Cached per session — call `clearAdminCache()` after mutating the
+ * whitelist if you need a fresh read.
+ */
+export async function isAdmin() {
+  if (_adminCache !== null) return _adminCache;
+  const user = await getUser();
+  if (!user?.email) return (_adminCache = false);
+  const { data, error } = await sb
+    .from('email_whitelist')
+    .select('is_admin')
+    .eq('email', user.email.toLowerCase())
+    .maybeSingle();
+  if (error) {
+    console.error('isAdmin lookup failed', error);
+    return false;
+  }
+  return (_adminCache = !!data?.is_admin);
+}
+
+export function clearAdminCache() {
+  _adminCache = null;
+}
+
 /**
  * Page-level gate. Call from any protected page.
  * If unauthenticated, redirects to /login.html and never resolves.

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whitelist — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">Email whitelist</h1>
+      <p class="text-sm text-gray-600">Only emails listed here can sign in and read data. Admins can manage this list. Service role bypass remains for the local sync engine.</p>
+    </div>
+
+    <div id="not-admin" class="hidden bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-900 mb-4">
+      You are signed in but not an administrator. This page is read-only for non-admins.
+    </div>
+
+    <section id="add-section" class="hidden bg-white border border-gray-200 rounded-lg p-4 mb-6">
+      <h2 class="font-semibold mb-3">Add email</h2>
+      <form id="add-form" class="flex flex-wrap items-center gap-3">
+        <input
+          id="email-input"
+          type="email"
+          required
+          placeholder="someone@example.com"
+          class="flex-1 min-w-[16rem] border border-gray-300 rounded px-3 py-2 text-sm"
+        />
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <input id="admin-input" type="checkbox" class="w-4 h-4" />
+          admin
+        </label>
+        <button
+          type="submit"
+          class="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-700"
+        >Add</button>
+      </form>
+      <p id="add-msg" class="text-sm mt-2 hidden"></p>
+    </section>
+
+    <div id="status" class="text-sm text-gray-500 mb-3">Loading…</div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-2">Email</th>
+            <th class="text-left px-4 py-2">Role</th>
+            <th class="text-left px-4 py-2">Added by</th>
+            <th class="text-left px-4 py-2">Created</th>
+            <th class="text-right px-4 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    import { sb, getUser, isAdmin, clearAdminCache } from '/auth.js';
+
+    await mountLayout({ active: 'whitelist' });
+    const me = await getUser();
+    const admin = await isAdmin();
+
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v;
+        else if (k === 'text') n.textContent = v;
+        else if (k === 'on') {
+          for (const [ev, h] of Object.entries(v)) n.addEventListener(ev, h);
+        }
+        else if (v === true) n.setAttribute(k, '');
+        else if (v != null) n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    }
+
+    function fmt(iso) { return iso ? new Date(iso).toISOString().slice(0, 10) : '—'; }
+
+    if (admin) {
+      document.getElementById('add-section').classList.remove('hidden');
+    } else {
+      document.getElementById('not-admin').classList.remove('hidden');
+    }
+
+    const tbody = document.getElementById('rows');
+    const status = document.getElementById('status');
+
+    async function load() {
+      tbody.replaceChildren();
+      status.textContent = 'Loading…';
+      const { data, error } = await sb
+        .from('email_whitelist')
+        .select('*')
+        .order('is_admin', { ascending: false })
+        .order('email', { ascending: true });
+      if (error) {
+        status.textContent = '';
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-red-600', colspan: '5', text: 'Error: ' + error.message }),
+        ]));
+        return;
+      }
+      status.textContent = `${data.length} entries`;
+      if (data.length === 0) {
+        tbody.appendChild(el('tr', {}, [
+          el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '5', text: 'No entries.' }),
+        ]));
+        return;
+      }
+      for (const row of data) {
+        const isMe = row.email === (me?.email || '').toLowerCase();
+        const cells = [
+          el('td', { class: 'px-4 py-2.5 font-mono text-xs' }, [
+            el('span', { text: row.email }),
+            isMe ? el('span', { class: 'ml-2 text-xs text-gray-400', text: '(you)' }) : el('span'),
+          ]),
+          el('td', { class: 'px-4 py-2.5' }, [
+            row.is_admin
+              ? el('span', { class: 'inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800', text: 'admin' })
+              : el('span', { class: 'text-xs text-gray-500', text: 'member' }),
+          ]),
+          el('td', { class: 'px-4 py-2.5 text-xs text-gray-500', text: row.added_by || '—' }),
+          el('td', { class: 'px-4 py-2.5 text-xs text-gray-500', text: fmt(row.created_at) }),
+        ];
+
+        const actions = el('td', { class: 'px-4 py-2.5 text-right' });
+        if (admin) {
+          actions.appendChild(el('button', {
+            type: 'button',
+            class: 'text-xs text-gray-600 hover:text-gray-900 underline-offset-2 hover:underline mr-3',
+            text: row.is_admin ? 'demote' : 'promote',
+            disabled: isMe ? '' : null,
+            title: isMe ? 'You cannot change your own admin status' : '',
+            on: {
+              click: async () => {
+                if (isMe) return;
+                const { error } = await sb
+                  .from('email_whitelist')
+                  .update({ is_admin: !row.is_admin })
+                  .eq('email', row.email);
+                if (error) { alert(error.message); return; }
+                clearAdminCache();
+                load();
+              },
+            },
+          }));
+          actions.appendChild(el('button', {
+            type: 'button',
+            class: 'text-xs text-red-600 hover:text-red-800 underline-offset-2 hover:underline',
+            text: 'remove',
+            disabled: isMe ? '' : null,
+            title: isMe ? 'You cannot remove yourself' : '',
+            on: {
+              click: async () => {
+                if (isMe) return;
+                if (!confirm(`Remove ${row.email} from the whitelist?`)) return;
+                const { error } = await sb
+                  .from('email_whitelist')
+                  .delete()
+                  .eq('email', row.email);
+                if (error) { alert(error.message); return; }
+                load();
+              },
+            },
+          }));
+        }
+        tbody.appendChild(el('tr', { class: 'border-t border-gray-100' }, [...cells, actions]));
+      }
+    }
+
+    if (admin) {
+      const form = document.getElementById('add-form');
+      const input = document.getElementById('email-input');
+      const adminCb = document.getElementById('admin-input');
+      const msg = document.getElementById('add-msg');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.classList.add('hidden');
+        msg.className = 'text-sm mt-2 hidden';
+        const email = input.value.trim().toLowerCase();
+        if (!email) return;
+        const { error } = await sb
+          .from('email_whitelist')
+          .insert({ email, is_admin: adminCb.checked, added_by: me?.email || null });
+        if (error) {
+          msg.textContent = error.message;
+          msg.className = 'text-sm mt-2 text-red-600';
+          msg.classList.remove('hidden');
+          return;
+        }
+        input.value = '';
+        adminCb.checked = false;
+        msg.textContent = `Added ${email}`;
+        msg.className = 'text-sm mt-2 text-green-700';
+        msg.classList.remove('hidden');
+        load();
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>
