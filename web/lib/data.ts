@@ -25,6 +25,8 @@ export type ActivityRow = {
   review_status: 'unverified' | 'verified' | 'flagged' | 'rejected' | null;
   review_note: string | null;
   cancellation_policy: string | null;
+  cover_image_url: string | null;
+  screenshot_url: string | null;
 };
 
 export type SessionRow = {

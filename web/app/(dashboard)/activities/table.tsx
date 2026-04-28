@@ -56,11 +56,27 @@ export function ActivitiesTable({ rows }: { rows: ActivityRow[] }) {
                   {r.poi ?? '—'}
                 </TableCell>
                 <TableCell>
-                  <div className="truncate font-medium" title={r.title ?? ''}>
-                    {r.title ?? '(untitled)'}
-                  </div>
-                  <div className="truncate text-xs text-zinc-400 font-mono">
-                    {r.platform_product_id ?? ''}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {r.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={r.cover_image_url}
+                        alt=""
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded object-cover bg-zinc-100 shrink-0 border border-zinc-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-zinc-100 shrink-0 border border-zinc-200" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium" title={r.title ?? ''}>
+                        {r.title ?? '(untitled)'}
+                      </div>
+                      <div className="truncate text-xs text-zinc-400 font-mono">
+                        {r.platform_product_id ?? ''}
+                      </div>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell className="text-xs text-zinc-600 truncate" title={r.supplier ?? ''}>

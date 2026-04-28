@@ -19,17 +19,17 @@ export function ActivityDialog({
 }) {
   return (
     <Dialog open={!!activity} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="!max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto sm:!max-w-5xl">
         {activity ? (
-          <>
+          <div className="space-y-5">
             <DialogHeader>
               <div className="flex items-center gap-2 mb-1">
                 <PlatformBadge platform={activity.platform} />
-                <span className="text-xs text-zinc-400 font-mono">
+                <span className="text-xs text-zinc-400 font-mono break-all">
                   id {activity.platform_product_id}
                 </span>
               </div>
-              <DialogTitle className="text-lg leading-tight pr-6">
+              <DialogTitle className="text-xl leading-tight pr-6">
                 {activity.title ?? '(untitled)'}
               </DialogTitle>
               {activity.canonical_url ? (
@@ -43,6 +43,52 @@ export function ActivityDialog({
                 </a>
               ) : null}
             </DialogHeader>
+
+            {activity.cover_image_url ? (
+              <section>
+                <div className="aspect-video bg-zinc-100 rounded-lg overflow-hidden border border-zinc-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activity.cover_image_url}
+                    alt={activity.title ?? ''}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </section>
+            ) : null}
+
+            {activity.screenshot_url ? (
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                    Scrape screenshot
+                  </h3>
+                  <a
+                    href={activity.screenshot_url}
+                    target="_blank"
+                    rel="noopener"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Open full size →
+                  </a>
+                </div>
+                <a
+                  href={activity.screenshot_url}
+                  target="_blank"
+                  rel="noopener"
+                  className="block bg-zinc-100 rounded-lg overflow-hidden border border-zinc-200 max-h-96"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activity.screenshot_url}
+                    alt="Page screenshot"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-auto"
+                  />
+                </a>
+              </section>
+            ) : null}
 
             <section className="space-y-1">
               <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
@@ -90,7 +136,7 @@ export function ActivityDialog({
                 value={activity.cancellation_policy}
               />
             ) : null}
-          </>
+          </div>
         ) : null}
       </DialogContent>
     </Dialog>
