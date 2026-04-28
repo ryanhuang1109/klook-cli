@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# build-time generated public assets (filled by prebuild)
+/public/routine-state.json
+/public/reports/
+/public/exports/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

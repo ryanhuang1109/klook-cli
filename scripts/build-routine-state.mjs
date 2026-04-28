@@ -4,7 +4,8 @@
  * static JSON file that /tours.html on Vercel can fetch without a server.
  *
  * Writes:
- *   dist/web/public/routine-state.json
+ *   dist/web/public/routine-state.json   (old static dashboard)
+ *   web/public/routine-state.json        (new Next.js dashboard)
  *
  * The sibling daily-routine.sh stamps data/host-info.json with hostname and
  * last-run timestamp each time cron fires. That file is commited so Vercel
@@ -74,20 +75,28 @@ async function main() {
     sessions,
   };
 
-  const outDir = path.join(repoRoot, 'dist', 'web', 'public');
-  fs.mkdirSync(outDir, { recursive: true });
-  const outPath = path.join(outDir, 'routine-state.json');
-  fs.writeFileSync(outPath, JSON.stringify(state, null, 2));
+  const json = JSON.stringify(state, null, 2);
+  const targets = [
+    path.join(repoRoot, 'dist', 'web', 'public'),
+    path.join(repoRoot, 'web', 'public'),
+  ];
+  for (const dir of targets) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'routine-state.json'), json);
+  }
   process.stdout.write(`routine-state.json: ${sessions.length} sessions, config=${config ? 'yes' : 'no'}, host=${host ? host.hostname : 'unknown'}\n`);
 }
 
 main().catch((err) => {
   process.stderr.write('build-routine-state failed: ' + err.message + '\n');
   // Don't fail the build — the page has graceful fallbacks.
-  const outDir = path.join(repoRoot, 'dist', 'web', 'public');
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(outDir, 'routine-state.json'),
-    JSON.stringify({ generated_at: new Date().toISOString(), error: err.message }, null, 2),
-  );
+  const stub = JSON.stringify({ generated_at: new Date().toISOString(), error: err.message }, null, 2);
+  const targets = [
+    path.join(repoRoot, 'dist', 'web', 'public'),
+    path.join(repoRoot, 'web', 'public'),
+  ];
+  for (const dir of targets) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'routine-state.json'), stub);
+  }
 });

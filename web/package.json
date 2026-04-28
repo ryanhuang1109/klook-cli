@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node ../scripts/build-routine-state.mjs || true && mkdir -p public/reports public/exports && (cp -R ../data/reports/. public/reports/ 2>/dev/null || true) && (cp ../data/exports/*.csv public/exports/ 2>/dev/null || true)",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
