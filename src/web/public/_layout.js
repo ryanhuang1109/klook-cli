@@ -14,12 +14,12 @@
 import { requireSession, getUser, signOut, isAdmin } from '/auth.js';
 
 const NAV = [
-  { href: '/dashboard.html', label: 'POI Compare', key: 'dashboard' },
-  { href: '/tours.html', label: 'Tours Routine', key: 'tours' },
   { href: '/coverage.html', label: 'Coverage', key: 'coverage' },
   { href: '/runs.html', label: 'Runs', key: 'runs' },
   { href: '/executions.html', label: 'Executions', key: 'executions' },
+  { href: '/tours.html', label: 'Tours', key: 'tours' },
   { href: '/cron.html', label: 'Cron', key: 'cron' },
+  { href: '/archive.html', label: 'Archive', key: 'archive' },
 ];
 
 const ADMIN_NAV = [

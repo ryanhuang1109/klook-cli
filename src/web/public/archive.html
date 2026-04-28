@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Archive — klook-cli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold">Archive</h1>
+      <p class="text-sm text-gray-600 mt-1">Features that used to live in this dashboard but are no longer surfaced here. Listed for reference; the underlying CLI commands still work locally.</p>
+    </div>
+
+    <section class="bg-white border border-gray-200 rounded-lg p-5">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <h2 class="font-semibold">POI Compare</h2>
+        <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">CLI only</span>
+      </div>
+      <p class="text-sm text-gray-700 mb-3">
+        Cross-platform price comparison with LLM clustering. Used to be at <code class="text-xs bg-gray-100 px-1 rounded">/dashboard.html</code>. The web form pointed at a local Express server, which doesn't exist on the Vercel deploy, so the page is gone. The functionality lives on in the CLI:
+      </p>
+      <pre class="text-xs bg-gray-900 text-gray-100 rounded p-3 overflow-x-auto"><code>node dist/cli.js list-pois
+node dist/cli.js add-poi "Mt Fuji" --keywords "Mt Fuji tour" --platforms klook,trip,getyourguide,kkday
+node dist/cli.js compare-poi "Mt Fuji" --date 2026-05-01 --save
+node dist/cli.js get-poi-price-history "Mt Fuji" --days 7</code></pre>
+      <p class="text-xs text-gray-500 mt-2">
+        POI config lives at <code class="bg-gray-100 px-1 rounded">~/.klook-cli/pois.json</code>; compare history at <code class="bg-gray-100 px-1 rounded">~/.klook-cli/history.db</code>. Both are local files — they aren't mirrored to Supabase yet, so coworkers can't see this data through the dashboard.
+      </p>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-lg p-5">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <h2 class="font-semibold">Landing &amp; About pages</h2>
+        <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">removed</span>
+      </div>
+      <p class="text-sm text-gray-700">
+        The marketing-style <code class="text-xs bg-gray-100 px-1 rounded">/index.html</code> and <code class="text-xs bg-gray-100 px-1 rounded">/about.html</code> pages were dropped — this is an internal tool, not a public site. The dashboard root now redirects straight to the Coverage view.
+      </p>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-lg p-5">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <h2 class="font-semibold">Tours "Run now" form</h2>
+        <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">local only</span>
+      </div>
+      <p class="text-sm text-gray-700 mb-3">
+        The button on <a href="/tours.html" class="text-blue-600 hover:underline">/tours.html</a> that kicks off a fresh competitor scan calls a local Express endpoint that spawns a Node child process — neither exists on Vercel, so the form is hidden in production. Run from the CLI instead:
+      </p>
+      <pre class="text-xs bg-gray-900 text-gray-100 rounded p-3 overflow-x-auto"><code>node dist/cli.js tours run --destination tokyo --keyword "mt fuji" \
+  --competitors klook,trip,getyourguide,kkday --limit 10 --poi "Mt Fuji"</code></pre>
+      <p class="text-xs text-gray-500 mt-2">
+        Once the local run finishes, <code class="bg-gray-100 px-1 rounded">tours sync-to-supabase</code> publishes the results so they appear on the live Tours / Runs / Executions views.
+      </p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { mountLayout } from '/_layout.js';
+    await mountLayout({ active: 'archive' });
+  </script>
+</body>
+</html>

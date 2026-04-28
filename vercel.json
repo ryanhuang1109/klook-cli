@@ -3,6 +3,10 @@
   "outputDirectory": "dist/web/public",
   "cleanUrls": true,
   "redirects": [
+    { "source": "/", "destination": "/coverage.html", "permanent": false },
+    { "source": "/dashboard.html", "destination": "/archive.html", "permanent": false },
+    { "source": "/index.html", "destination": "/coverage.html", "permanent": false },
+    { "source": "/about.html", "destination": "/archive.html", "permanent": false },
     { "source": "/report", "destination": "/reports/latest.html", "permanent": false },
     { "source": "/csv", "destination": "/exports/latest.csv", "permanent": false }
   ]

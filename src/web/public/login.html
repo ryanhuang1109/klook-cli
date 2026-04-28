@@ -51,7 +51,7 @@
     try {
       const session = await getSession();
       if (session) {
-        const next = new URLSearchParams(location.search).get('next') || '/dashboard.html';
+        const next = new URLSearchParams(location.search).get('next') || '/coverage.html';
         location.replace(next);
       }
     } catch {}
