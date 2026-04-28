@@ -12,7 +12,7 @@
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen">
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+  <main class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
     <div class="mb-4 flex items-center justify-between gap-4 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">Activities</h1>
@@ -51,7 +51,6 @@
             <th class="text-right px-3 py-2">Pkg</th>
             <th class="text-right px-3 py-2">SKU</th>
             <th class="text-right px-3 py-2">Price USD</th>
-            <th class="text-left px-3 py-2">Status</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -169,7 +168,7 @@
       tbody.replaceChildren();
       if (rows.length === 0) {
         tbody.appendChild(el('tr', {}, [
-          el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '11', text: 'No activities match the filter.' }),
+          el('td', { class: 'px-4 py-6 text-center text-gray-400', colspan: '10', text: 'No activities match the filter.' }),
         ]));
         return;
       }
@@ -202,7 +201,6 @@
           el('td', { class: 'px-3 py-2 text-right tabular-nums', text: String(r.package_count ?? 0) }),
           el('td', { class: 'px-3 py-2 text-right tabular-nums', text: String(r.sku_count ?? 0) }),
           el('td', { class: 'px-3 py-2 text-right tabular-nums font-medium', text: priceRange(r.min_price_usd, r.max_price_usd) }),
-          el('td', { class: 'px-3 py-2' }, [statusBadge(r.review_status)]),
         ]);
         tr.addEventListener('click', () => openModal(r));
         tbody.appendChild(tr);

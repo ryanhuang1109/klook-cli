@@ -46,7 +46,7 @@ export async function mountLayout({ active }) {
   const user = await getUser();
 
   const header = el('header', { class: 'border-b border-gray-200 bg-white' });
-  const wrap = el('div', { class: 'max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4 flex-wrap' });
+  const wrap = el('div', { class: 'max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex items-center gap-4 flex-wrap' });
 
   const brand = el('a', { href: '/', class: 'flex items-center gap-2 shrink-0' }, [
     el('span', {

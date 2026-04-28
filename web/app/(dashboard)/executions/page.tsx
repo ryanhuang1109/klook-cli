@@ -43,7 +43,7 @@ export default async function ExecutionsPage({
   const failRate = totalCount === 0 ? 0 : Math.round(((totalCount - okCount) / totalCount) * 100);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <h1 className="text-2xl font-semibold tracking-tight">Executions</h1>
         <ExecutionsFilters

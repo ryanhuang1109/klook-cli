@@ -28,7 +28,7 @@ export default async function CoveragePage() {
   const lowCoverage = rows.filter((r) => r.coverage_pct != null && r.coverage_pct < 0.5).length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Coverage</h1>
       </div>
