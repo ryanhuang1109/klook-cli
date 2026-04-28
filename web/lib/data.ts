@@ -27,6 +27,35 @@ export type ActivityRow = {
   cancellation_policy: string | null;
   cover_image_url: string | null;
   screenshot_url: string | null;
+  description: string | null;
+  raw_extras_json: string | Record<string, unknown> | null;
+};
+
+export type PackageRow = {
+  id: number;
+  activity_id: number;
+  platform_package_id: string | null;
+  title: string | null;
+  tour_type: string | null;
+  group_size: string | null;
+  meals: boolean | null;
+  departure_city: string | null;
+  departure_time: string | null;
+  duration_minutes: number | null;
+  available_languages: string[] | string | null;
+  inclusions: string[] | string | null;
+  exclusions: string[] | string | null;
+};
+
+export type SkuRow = {
+  id: number;
+  package_id: number;
+  travel_date: string;
+  price_local: number | null;
+  price_usd: number | null;
+  currency: string | null;
+  available: boolean | null;
+  last_checked_at: string | null;
 };
 
 export type SessionRow = {
@@ -102,6 +131,31 @@ export async function listActivitiesWithStats(opts: {
   const { data, error } = await q;
   if (error) throw new Error(`activities: ${error.message}`);
   return (data ?? []) as ActivityRow[];
+}
+
+export async function listPackagesForActivity(activityId: number): Promise<PackageRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from('packages')
+    .select('*')
+    .eq('activity_id', activityId)
+    .order('id');
+  if (error) throw new Error(`packages: ${error.message}`);
+  return (data ?? []) as PackageRow[];
+}
+
+export async function listSkusForActivity(activityId: number): Promise<SkuRow[]> {
+  const pkgs = await listPackagesForActivity(activityId);
+  if (pkgs.length === 0) return [];
+  const sb = await createClient();
+  const ids = pkgs.map((p) => p.id);
+  const { data, error } = await sb
+    .from('skus')
+    .select('*')
+    .in('package_id', ids)
+    .order('travel_date');
+  if (error) throw new Error(`skus: ${error.message}`);
+  return (data ?? []) as SkuRow[];
 }
 
 export async function listSessions(limit = 50): Promise<SessionRow[]> {
