@@ -39,6 +39,8 @@ export interface IngestListingOptions {
   noPricing?: boolean;
   /** Skip the detail-level fetch (supplier / cancellation / description). */
   noDetail?: boolean;
+  /** Skip the page-screenshot capture + upload (default: capture). */
+  noScreenshot?: boolean;
   /** Days of pricing matrix per new activity (default 7). */
   days?: number;
 }
@@ -87,6 +89,8 @@ export async function ingestFromListing(
       // policy / description / order_count populated. Detail failure is
       // non-fatal — pricing still runs and writes the activity row with
       // whatever fields it can populate. Skip when --no-detail is passed.
+      // Screenshots are captured + uploaded to Supabase Storage so coworkers
+      // have an audit trail of what we actually saw on the page.
       if (!opts.noDetail) {
         try {
           await ingestFromDetail(db, {
@@ -95,6 +99,7 @@ export async function ingestFromListing(
             poi: listing.poi,
             canonicalUrl: a.canonical_url,
             agentMode: 'none',
+            captureScreenshot: !opts.noScreenshot,
           });
         } catch (err) {
           // Surface but don't bail — pricing path is the higher-value

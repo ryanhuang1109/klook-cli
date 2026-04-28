@@ -395,22 +395,27 @@ export async function ingestFromDetail(
   fs.writeFileSync(snapPath, JSON.stringify({ source: 'detail', detail_raw: detail, normalized: raw }, null, 2));
 
   let screenshotPath: string | null = null;
+  let screenshotUrl: string | null = null;
   if (opts.captureScreenshot) {
     try {
-      const { captureScreenshot } = await import('./screenshot.js');
+      const { captureAndUploadScreenshot } = await import('./screenshot-upload.js');
       const url = opts.canonicalUrl ?? detail?.url ?? `https://www.${opts.platform}.com`;
-      screenshotPath = await captureScreenshot(url, opts.platform, opts.activityId, {
+      const r = await captureAndUploadScreenshot(url, opts.platform, opts.activityId, {
         scrollTimes: 1,
       });
+      screenshotPath = r.localPath;
+      screenshotUrl = r.publicUrl;
     } catch (err) {
       // Screenshot is best-effort — don't fail the ingest
       console.error(`(screenshot failed for ${opts.platform}/${opts.activityId}: ${(err as Error).message.slice(0, 160)})`);
     }
   }
 
-  // Inject screenshot path into detail so normalizer stores it as an extra
+  // Inject screenshot path + Supabase Storage URL into detail so the
+  // normalizer stores them as raw_extras. The dashboard reads
+  // raw_extras_json -> screenshot_url to render the audit thumbnail.
   let detailWithShot: any = screenshotPath
-    ? { ...detail, screenshot_path: path.relative(process.cwd(), screenshotPath) }
+    ? { ...detail, screenshot_path: path.relative(process.cwd(), screenshotPath), screenshot_url: screenshotUrl }
     : detail;
 
   // ── Agent-browser fallback ─────────────────────────────────────────

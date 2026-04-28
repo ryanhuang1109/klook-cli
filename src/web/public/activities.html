@@ -175,10 +175,22 @@
       }
 
       for (const r of rows) {
-        const titleCell = el('td', { class: 'px-3 py-2 max-w-[22rem]' }, [
+        const titleInner = el('div', { class: 'min-w-0 flex-1' }, [
           el('div', { class: 'truncate font-medium', title: r.title || '', text: r.title || '(untitled)' }),
           el('div', { class: 'text-xs text-gray-400 truncate', text: r.platform_product_id || '' }),
         ]);
+        const titleWrap = el('div', { class: 'flex items-center gap-2.5' });
+        if (r.cover_image_url) {
+          titleWrap.appendChild(el('img', {
+            src: r.cover_image_url,
+            alt: '',
+            loading: 'lazy',
+            referrerpolicy: 'no-referrer',
+            class: 'w-10 h-10 rounded object-cover bg-gray-100 shrink-0 border border-gray-200',
+          }));
+        }
+        titleWrap.appendChild(titleInner);
+        const titleCell = el('td', { class: 'px-3 py-2 max-w-[22rem]' }, [titleWrap]);
         const tr = el('tr', { class: 'border-t border-gray-100 hover:bg-gray-50 cursor-pointer' }, [
           el('td', { class: 'px-3 py-2' }, [platformBadge(r.platform)]),
           el('td', { class: 'px-3 py-2 text-gray-700', text: r.poi || '—' }),
@@ -217,6 +229,47 @@
         class: 'text-xs text-blue-600 hover:underline break-all block mt-1',
         text: activity.canonical_url,
       }));
+
+      // Cover image (when the platform exposed one in raw_extras_json).
+      // 16:9 hero — generous but not so tall that the modal scroll target
+      // disappears below the fold on smaller screens.
+      if (activity.cover_image_url) {
+        modalBody.appendChild(el('section', {}, [
+          el('div', { class: 'aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200' }, [
+            el('img', {
+              src: activity.cover_image_url,
+              alt: activity.title || '',
+              referrerpolicy: 'no-referrer',
+              class: 'w-full h-full object-cover',
+            }),
+          ]),
+        ]));
+      }
+      // Screenshot of the actual scraped page (proof). Renders as a side-by-
+      // side comparable below the cover when present.
+      if (activity.screenshot_url) {
+        modalBody.appendChild(el('section', {}, [
+          el('div', { class: 'flex items-center justify-between mb-2' }, [
+            el('h3', { class: 'text-xs font-semibold text-gray-500 uppercase tracking-wide', text: 'Scrape screenshot' }),
+            el('a', {
+              href: activity.screenshot_url, target: '_blank', rel: 'noopener',
+              class: 'text-xs text-blue-600 hover:underline',
+              text: 'Open full size →',
+            }),
+          ]),
+          el('a', {
+            href: activity.screenshot_url, target: '_blank', rel: 'noopener',
+            class: 'block bg-gray-100 rounded-lg overflow-hidden border border-gray-200 max-h-96',
+          }, [
+            el('img', {
+              src: activity.screenshot_url,
+              alt: 'Page screenshot',
+              referrerpolicy: 'no-referrer',
+              class: 'w-full h-auto',
+            }),
+          ]),
+        ]));
+      }
 
       // Meta grid
       const meta = el('section', {}, [
