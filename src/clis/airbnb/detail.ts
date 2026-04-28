@@ -32,17 +32,61 @@ export function buildDetailEvaluate(): string {
 
       const bodyText = document.body.innerText;
 
-      // Rating: Airbnb shows "4.92" near the title, often followed by "(127 reviews)"
-      // or "★ 4.92 · 127 reviews". Match conservatively.
+      // Rating + review count.
+      //
+      // Airbnb embeds a schema.org Product JSON-LD blob in the head with
+      // aggregateRating.ratingValue / reviewCount — that's locale-
+      // independent and survives partial hydration. Diagnostic dump
+      // 2026-04-28 confirmed body.innerText is < 3KB on these pages
+      // (just the no-JS notice) until React fully renders, so any
+      // bodyText-based fallback is fragile. JSON-LD first, then aria-
+      // label patterns covering en / zh-TW / ja / ko, then bodyText as
+      // last resort.
       let starScore = '', reviewCount = '';
-      const ratingMatch =
-        bodyText.match(/(\\d\\.\\d{1,2})\\s*(?:★|out of 5|\\()/) ||
-        bodyText.match(/★\\s*(\\d\\.\\d{1,2})/);
-      if (ratingMatch) starScore = ratingMatch[1];
-      const reviewMatch =
-        bodyText.match(/\\((\\d[\\d,]*)\\s*reviews?\\)/i) ||
-        bodyText.match(/(\\d[\\d,]*)\\s*reviews?/i);
-      if (reviewMatch) reviewCount = reviewMatch[1] + ' reviews';
+      let ldProduct = null;
+      for (const ldNode of document.querySelectorAll('script[type="application/ld+json"]')) {
+        try {
+          const parsed = JSON.parse(ldNode.textContent || '');
+          const arr = Array.isArray(parsed) ? parsed : [parsed];
+          for (const obj of arr) {
+            if (obj && obj['@type'] === 'Product') { ldProduct = obj; break; }
+          }
+        } catch (_) { /* ignore malformed json-ld */ }
+        if (ldProduct) break;
+      }
+      if (ldProduct && ldProduct.aggregateRating) {
+        if (ldProduct.aggregateRating.ratingValue != null) {
+          starScore = String(ldProduct.aggregateRating.ratingValue);
+        }
+        // schema.org AggregateRating uses ratingCount; some sites also emit
+        // reviewCount. Accept either.
+        const cnt = ldProduct.aggregateRating.reviewCount
+                 ?? ldProduct.aggregateRating.ratingCount;
+        if (cnt != null) reviewCount = String(cnt) + ' reviews';
+      }
+      // Aria-label fallback for any locale: "Rated 4.99 out of 5",
+      // "獲得 4.99 星評分", "5つ星のうち 4.99 の評価", "5점 만점에 4.99점" etc.
+      if (!starScore) {
+        for (const node of document.querySelectorAll('[aria-label]')) {
+          const aria = node.getAttribute('aria-label') || '';
+          const am = aria.match(/(\\d+\\.\\d{1,2})\\s*(?:out of|stars?|星評分|星评分|の評価|점|점\\s*만점)/i);
+          if (am) { starScore = am[1]; break; }
+        }
+      }
+      // Body-text last resort. Use textContent (innerText is hydration-empty).
+      if (!starScore || !reviewCount) {
+        const tc = document.body.textContent || '';
+        if (!starScore) {
+          const m = tc.match(/(\\d+\\.\\d{1,2})\\s*[★·\\u00b7\\u2605]\\s*(\\d[\\d,]*)\\s*reviews?/i)
+                 || tc.match(/★\\s*(\\d+\\.\\d{1,2})/)
+                 || tc.match(/(\\d+\\.\\d{1,2})\\s*(?:out of 5)/i);
+          if (m) starScore = m[1];
+        }
+        if (!reviewCount) {
+          const rm = tc.match(/\\((\\d[\\d,]*)\\s*reviews?\\)/i);
+          if (rm) reviewCount = rm[1].replace(/,/g, '') + ' reviews';
+        }
+      }
 
       // Supplier: prefer the business name ("Owner of <Business>" / "Founder
       // of <Business>") which sits one line below "Hosted by <Person>" — the
@@ -183,6 +227,10 @@ export function buildDetailEvaluate(): string {
       const cancelSection = sections.find((s) => s.title === 'Cancellation policy');
       let cancellationPolicy = cancelSection ? cancelSection.content : '';
       if (!cancellationPolicy) cancellationPolicy = extractCancellationFromBody(bodyText);
+
+      // TEMP DIAG — dump aria-labels + a body slice to figure out where the
+      // rating widget hides on the current Airbnb DOM. Remove once selector
+      // is fixed.
 
       return {
         title,
