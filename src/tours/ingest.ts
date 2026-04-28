@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import type { ToursDB } from './db.js';
 import type { Platform, PricingRunRaw, PricingRowRaw } from './types.js';
 import { normalizePricingRun } from './normalize.js';
+import { urlForLanguage } from './url-locale.js';
 
 function stripOpencliNoise(output: string): string {
   return output
@@ -190,6 +191,12 @@ export interface IngestOptions {
   days?: number;
   canonicalUrl?: string;
   snapshotDir?: string;
+  /**
+   * ISO language code (e.g. "en", "zh-tw", "pa"). When set, the URL handed
+   * to opencli is rewritten to that locale (see src/tours/url-locale.ts) so
+   * platforms like GYG return the package set for that language.
+   */
+  language?: string;
 }
 
 export interface IngestResult {
@@ -243,6 +250,33 @@ function snapshotPath(dir: string, platform: string, activityId: string): string
  *
  * Mutates `normalized.activity.raw_extras_json` in place.
  */
+/**
+ * Merge new and existing `available_languages` for a single package so a
+ * second ingest under a different locale doesn't overwrite the first
+ * locale's record. Result is a deduped union, preserving order of first
+ * seen.
+ */
+function mergePackageLanguages(
+  newPkg: { available_languages: unknown },
+  existing: { available_languages: unknown } | null | undefined,
+): void {
+  const oldList = Array.isArray(existing?.available_languages)
+    ? (existing!.available_languages as string[])
+    : [];
+  const newList = Array.isArray(newPkg.available_languages)
+    ? (newPkg.available_languages as string[])
+    : [];
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const v of [...oldList, ...newList]) {
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      merged.push(v);
+    }
+  }
+  newPkg.available_languages = merged;
+}
+
 function mergeRawExtras(
   normalized: { activity: { raw_extras_json: string } },
   existing: { raw_extras_json: string } | null,
@@ -263,7 +297,13 @@ export async function ingestPricing(
     opts.snapshotDir ?? path.join(process.cwd(), 'data', 'snapshots');
   fs.mkdirSync(snapshotDir, { recursive: true });
 
-  const raw = runPricingRaw(opts.platform, opts.activityId, opts.days ?? 7);
+  // When a language is specified, rewrite URL-shaped activity ids to that
+  // locale so the opencli adapter renders the language-specific package
+  // set. Bare ids fall through unchanged.
+  const opencliArg = opts.language && opts.activityId.startsWith('http')
+    ? urlForLanguage(opts.platform, opts.activityId, opts.language)
+    : opts.activityId;
+  const raw = runPricingRaw(opts.platform, opencliArg, opts.days ?? 7);
 
   const snapPath = snapshotPath(snapshotDir, opts.platform, opts.activityId);
   fs.writeFileSync(snapPath, JSON.stringify(raw, null, 2));
@@ -281,7 +321,15 @@ export async function ingestPricing(
   mergeRawExtras(normalized, existing);
   db.upsertActivity(normalized.activity);
 
+  // Look up existing packages for this activity once, build a map by id,
+  // and use it to merge language arrays before upsert. Without this, a
+  // re-ingest under a different locale would overwrite the available_languages
+  // column instead of unioning.
+  const priorPkgsByIdA = new Map(
+    db.listPackagesForActivity(normalized.activity.id).map((p) => [p.id, p]),
+  );
   for (const pkg of normalized.packages.values()) {
+    mergePackageLanguages(pkg as any, priorPkgsByIdA.get(pkg.id) as any);
     db.upsertPackage(pkg);
   }
 
@@ -377,6 +425,12 @@ export async function ingestFromDetail(
      * dropdowns/tabs ('loop'). Default is 'oneshot' for cost reasons.
      */
     agentMode?: 'oneshot' | 'loop' | 'none';
+    /**
+     * ISO language hint. When set, the URL handed to opencli is rewritten to
+     * that locale via src/tours/url-locale.ts. GYG is the only platform
+     * implementing the rewrite today; others ignore.
+     */
+    language?: string;
   },
 ): Promise<IngestResult> {
   const execStart = Date.now();
@@ -389,9 +443,13 @@ export async function ingestFromDetail(
   // Prefer the full canonical URL when available — important for GetYourGuide
   // where the ID-only URL (`/activity/t123/`) is a synthetic fallback, not the
   // real slug path (`/city-l1/title-t123/`), and can fail to resolve reliably.
-  const detailArg = opts.canonicalUrl?.startsWith('http')
+  const baseDetailArg = opts.canonicalUrl?.startsWith('http')
     ? opts.canonicalUrl
     : opts.activityId;
+  // Locale rewrite (no-op for platforms we haven't implemented yet).
+  const detailArg = opts.language && baseDetailArg.startsWith('http')
+    ? urlForLanguage(opts.platform, baseDetailArg, opts.language)
+    : baseDetailArg;
 
   const output = execFileSync(
     'opencli',
@@ -410,10 +468,11 @@ export async function ingestFromDetail(
 
   const raw = detailToPricingRun(opts.platform, opts.activityId, detail, travelDate);
 
-  const snapPath = path.join(
-    snapshotDir,
-    `${opts.platform}-${opts.activityId}-detail-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
-  );
+  // Use the shared snapshotPath helper to sanitise activityId — when this
+  // is a URL (always the case for GYG, sometimes elsewhere) the raw value
+  // would push the snapshot file into nonexistent subdirectories.
+  const snapPath = snapshotPath(snapshotDir, opts.platform, opts.activityId)
+    .replace(/\.json$/, '-detail.json');
   fs.writeFileSync(snapPath, JSON.stringify({ source: 'detail', detail_raw: detail, normalized: raw }, null, 2));
 
   let screenshotPath: string | null = null;
@@ -545,7 +604,13 @@ export async function ingestFromDetail(
   if (existing) normalized.activity.first_scraped_at = existing.first_scraped_at;
   mergeRawExtras(normalized, existing);
   db.upsertActivity(normalized.activity);
-  for (const pkg of normalized.packages.values()) db.upsertPackage(pkg);
+  const priorDPkgsById = new Map(
+    db.listPackagesForActivity(normalized.activity.id).map((p) => [p.id, p]),
+  );
+  for (const pkg of normalized.packages.values()) {
+    mergePackageLanguages(pkg as any, priorDPkgsById.get(pkg.id) as any);
+    db.upsertPackage(pkg);
+  }
   for (const sku of normalized.skus) db.upsertSKU(sku);
   for (const obs of normalized.observations) db.appendObservation(obs);
 
@@ -593,7 +658,13 @@ export async function ingestFromSnapshot(
   }
   mergeRawExtras(normalized, existing);
   db.upsertActivity(normalized.activity);
-  for (const pkg of normalized.packages.values()) db.upsertPackage(pkg);
+  const priorSPkgsById = new Map(
+    db.listPackagesForActivity(normalized.activity.id).map((p) => [p.id, p]),
+  );
+  for (const pkg of normalized.packages.values()) {
+    mergePackageLanguages(pkg as any, priorSPkgsById.get(pkg.id) as any);
+    db.upsertPackage(pkg);
+  }
   for (const sku of normalized.skus) db.upsertSKU(sku);
   for (const obs of normalized.observations) db.appendObservation(obs);
 

@@ -30,6 +30,14 @@ export const ListingSchema = z.object({
   filter_signature: z.string().min(1),
   /** Total reported by the listing source's filter header. null when unknown. */
   total_in_filter: z.number().int().nonnegative().nullable().default(null),
+  /**
+   * Optional ISO language code (e.g. "en", "zh-tw", "pa"). When set, the
+   * ingest layer rewrites URLs to that locale before handing them to
+   * opencli, and packages keep their language-specific available_languages
+   * accumulated across runs. GYG is the only platform implementing the URL
+   * rewrite today; other platforms ignore this field for now.
+   */
+  language: z.string().optional(),
   activities: z.array(ListingActivitySchema),
 });
 export type Listing = z.infer<typeof ListingSchema>;
@@ -68,10 +76,16 @@ export async function ingestFromListing(
 ): Promise<IngestListingResult> {
   const listing = ListingSchema.parse(raw);
 
-  // Dedupe against existing activities.
+  // Dedupe against existing activities. When the listing carries a
+  // language code we deliberately bypass the dedup so a re-run under a
+  // different locale actually re-ingests — the package set on platforms
+  // like GYG can change per language, and we want the union, not the
+  // first-seen subset.
   const knownUrls = new Set(db.listActivities().map((a) => a.canonical_url));
   const incoming = listing.activities;
-  const newOnes = incoming.filter((a) => !knownUrls.has(a.canonical_url));
+  const newOnes = listing.language
+    ? incoming
+    : incoming.filter((a) => !knownUrls.has(a.canonical_url));
 
   const failures: { canonical_url: string; reason: string }[] = [];
   let ingestedPricing = 0;
@@ -100,6 +114,7 @@ export async function ingestFromListing(
             canonicalUrl: a.canonical_url,
             agentMode: 'none',
             captureScreenshot: !opts.noScreenshot,
+            language: listing.language,
           });
         } catch (err) {
           // Surface but don't bail — pricing path is the higher-value
@@ -118,6 +133,7 @@ export async function ingestFromListing(
           poi: listing.poi,
           days: opts.days,
           canonicalUrl: a.canonical_url,
+          language: listing.language,
         });
         ingestedPricing += 1;
       } catch (err) {
