@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +19,25 @@ export function TopbarUser({
   name: string | null;
   avatarUrl: string | null;
 }) {
+  const [signingOut, setSigningOut] = useState(false);
+
   if (!email) return null;
+
+  // Hit the POST endpoint directly and redirect on success. We can't use a
+  // <form> inside DropdownMenuContent — Radix portals the content out of the
+  // DOM tree, which strips the form ancestor and closest('form') returns null.
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const res = await fetch('/auth/signout', { method: 'POST' });
+      window.location.href = res.redirected ? res.url : '/login';
+    } catch {
+      // Network failure — surface to user via the same redirect path so the
+      // session cookie at least gets cleared on the server's next request.
+      window.location.href = '/login';
+    }
+  }
 
   return (
     <DropdownMenu>
@@ -45,16 +64,15 @@ export function TopbarUser({
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <form action="/auth/signout" method="post">
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              (e.currentTarget.closest('form') as HTMLFormElement | null)?.requestSubmit();
-            }}
-          >
-            Sign out
-          </DropdownMenuItem>
-        </form>
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            handleSignOut();
+          }}
+          disabled={signingOut}
+        >
+          {signingOut ? 'Signing out…' : 'Sign out'}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
