@@ -405,6 +405,45 @@ toursCmd
   });
 
 toursCmd
+  .command('scan')
+  .description('Scan/enrichment — search to detail. NEVER writes pricing.')
+  .requiredOption('--platform <p>', 'platform: klook|trip|getyourguide|kkday|airbnb')
+  .requiredOption('--poi <name>', 'POI label, also default keyword')
+  .option('--keyword <k>', 'override search keyword (defaults to --poi)')
+  .option('--limit <n>', 'top N hits to enrich', (v: string) => parseInt(v, 10), 30)
+  .option('--sort-by <s>', 'reviews|recommended', 'reviews')
+  .option('--screenshot', 'capture page screenshot', false)
+  .action(async (o: any) => {
+    const { cmdScan } = await import('./tours/commands.js');
+    await cmdScan({
+      platform: o.platform, poi: o.poi, keyword: o.keyword,
+      limit: o.limit, sortBy: o.sortBy, screenshot: o.screenshot,
+    });
+  });
+
+toursCmd
+  .command('pricing')
+  .description('Refresh pricing for pinned activities only. Exits 2 if none pinned.')
+  .requiredOption('--platform <p>', 'platform: klook|trip|getyourguide|kkday|airbnb')
+  .option('--poi <name>', 'restrict to one POI')
+  .option('--days <n>', 'days of pricing matrix', (v: string) => parseInt(v, 10), 7)
+  .action(async (o: any) => {
+    const { cmdPricing } = await import('./tours/commands.js');
+    await cmdPricing({ platform: o.platform, poi: o.poi, days: o.days });
+  });
+
+toursCmd
+  .command('pin')
+  .description('Pin top-N activities by review_count for daily price refresh.')
+  .requiredOption('--platform <p>', 'platform')
+  .requiredOption('--poi <name>', 'POI to pin within')
+  .option('--top <n>', 'number to pin', (v: string) => parseInt(v, 10), 5)
+  .action(async (o: any) => {
+    const { cmdPin } = await import('./tours/commands.js');
+    await cmdPin({ platform: o.platform, poi: o.poi, top: o.top });
+  });
+
+toursCmd
   .command('generate-report')
   .alias('report')
   .description('Generate HTML summary report (coverage, completeness, recent rows)')
