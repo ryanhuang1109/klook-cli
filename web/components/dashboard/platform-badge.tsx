@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { PlatformLogo } from './platform-logo';
 import type { Platform } from '@/lib/data';
 
 const TONE: Record<Platform, string> = {
@@ -19,5 +20,10 @@ const LABEL: Record<Platform, string> = {
 
 export function PlatformBadge({ platform }: { platform: Platform }) {
   const tone = TONE[platform] ?? 'bg-zinc-100 text-zinc-800 hover:bg-zinc-100 border-transparent';
-  return <Badge className={tone}>{LABEL[platform] ?? platform}</Badge>;
+  return (
+    <Badge className={`gap-1 pl-1 pr-2 ${tone}`}>
+      <PlatformLogo platform={platform} size={14} />
+      {LABEL[platform] ?? platform}
+    </Badge>
+  );
 }
