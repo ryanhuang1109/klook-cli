@@ -44,6 +44,9 @@ export interface ToursDB {
   reviewActivity(id: string, status: ReviewStatus, note: string | null): void;
   reviewSKU(id: string, status: ReviewStatus, note: string | null): void;
 
+  /** Returns column names for the given table (uses PRAGMA table_info). */
+  rawColumns(table: string): string[];
+
   listActivitySummaries(): ActivitySummaryRow[];
 
   logSearchRun(run: SearchRunLog): void;
@@ -232,7 +235,8 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
       first_scraped_at TEXT NOT NULL,
       last_scraped_at TEXT NOT NULL,
       review_status TEXT NOT NULL DEFAULT 'unverified',
-      review_note TEXT
+      review_note TEXT,
+      is_pinned INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_act_platform_pid ON activities(platform, platform_product_id);
     CREATE INDEX IF NOT EXISTS idx_act_poi ON activities(poi);
@@ -347,6 +351,9 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
   if (!existingCols.has('cancellation_policy')) {
     db.run(`ALTER TABLE activities ADD COLUMN cancellation_policy TEXT`);
   }
+  if (!existingCols.has('is_pinned')) {
+    db.run(`ALTER TABLE activities ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`);
+  }
 
   function persist(): void {
     const data = db.export();
@@ -370,11 +377,22 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
     return out;
   }
 
+  // Single source of truth for activity column order (SELECT and INSERT stay in sync).
+  const ACTIVITY_COLS = [
+    'id', 'platform', 'platform_product_id', 'canonical_url', 'title',
+    'supplier', 'poi', 'duration_minutes', 'departure_city',
+    'rating', 'review_count', 'order_count', 'description',
+    'cancellation_policy', 'raw_extras_json',
+    'first_scraped_at', 'last_scraped_at',
+    'review_status', 'review_note',
+    'is_pinned',
+  ] as const;
+
   return {
     upsertActivity(a) {
       db.run(
-        `INSERT INTO activities (id, platform, platform_product_id, canonical_url, title, supplier, poi, duration_minutes, departure_city, rating, review_count, order_count, description, cancellation_policy, raw_extras_json, first_scraped_at, last_scraped_at, review_status, review_note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO activities (${ACTIVITY_COLS.join(', ')})
+         VALUES (${ACTIVITY_COLS.map(() => '?').join(', ')})
          ON CONFLICT(id) DO UPDATE SET
            title = excluded.title,
            supplier = COALESCE(excluded.supplier, activities.supplier),
@@ -387,7 +405,8 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
            description = COALESCE(excluded.description, activities.description),
            cancellation_policy = COALESCE(excluded.cancellation_policy, activities.cancellation_policy),
            raw_extras_json = excluded.raw_extras_json,
-           last_scraped_at = excluded.last_scraped_at`,
+           last_scraped_at = excluded.last_scraped_at,
+           is_pinned = activities.is_pinned`,
         [
           a.id, a.platform, a.platform_product_id, a.canonical_url, a.title,
           a.supplier, a.poi, a.duration_minutes, a.departure_city,
@@ -395,6 +414,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
           a.cancellation_policy,
           a.raw_extras_json,
           a.first_scraped_at, a.last_scraped_at, a.review_status, a.review_note,
+          a.is_pinned ?? 0,
         ],
       );
       const changed = db.getRowsModified() > 0;
@@ -714,6 +734,14 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
              FROM coverage_runs ORDER BY id`,
           );
       return { activities, packages, skus, observations, sessions, executions, searchRuns, coverageRuns };
+    },
+
+    rawColumns(table: string): string[] {
+      const stmt = db.prepare(`PRAGMA table_info(${table})`);
+      const out: string[] = [];
+      while (stmt.step()) out.push((stmt.getAsObject() as any).name);
+      stmt.free();
+      return out;
     },
 
     close() {
