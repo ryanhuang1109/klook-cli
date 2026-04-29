@@ -65,5 +65,5 @@ This is URL-first, LLM-ranked, and typically faster than a full compare.
 
 ## What this skill is NOT
 
-- It does not ingest into the tours DB — that is `opencli-tours-routine`.
+- It does not ingest into the tours DB — that is `opencli-routine`.
 - It does not bulk-run without `--save` by default; always ask the user if they want the run persisted.

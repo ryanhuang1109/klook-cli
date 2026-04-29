@@ -107,7 +107,7 @@ Runtime: 1–3 minutes (search × N platforms + LLM clustering).
 
 ## 4. Tours pipeline (`node dist/cli.js tours <cmd>`)
 
-Canonical daily workflow lives in the **`opencli-tours-routine` skill**. Raw commands:
+Canonical daily workflow is orchestrated by the **`opencli-routine` skill** (delegates to `opencli-scan` / `opencli-pricing`). Raw commands:
 
 | Canonical | Alias | Purpose |
 |---|---|---|
@@ -149,7 +149,7 @@ Schema reference: `src/tours/db.ts` (Postgres-compatible except `AUTOINCREMENT`)
 | `opencli-trip` | Trip.com commands + quirks | TODO |
 | `opencli-getyourguide` | GetYourGuide commands + quirks | TODO |
 | `opencli-kkday` | KKday commands + quirks | TODO |
-| `opencli-tours-routine` | Daily tours ingest → export → report playbook | shared |
+| `opencli-routine` | Orchestrator that delegates to opencli-scan / opencli-pricing per (POI, platform) target | shared |
 | `opencli-compare-poi` | Cross-platform POI compare workflow | shared |
 
 Find the owner of any platform skill: `grep "^- \*\*Owner\*\*:" .claude/skills/*/SKILL.md`.
@@ -184,6 +184,6 @@ New platform skill template: `docs/skill-template-platform.md`.
 
 1. **Enrichment fields**: strikethrough price, discount amount, promo labels — not scraped today.
 2. **Automated validation harness**: we have `tours report` completeness flags but no per-metric `validate.js`-style unit checks.
-3. **Cron wiring for `opencli-tours-routine`**: skill is ready; scheduled routine prompt not yet configured.
+3. **Cron wiring for `opencli-routine`**: skill is ready; scheduled routine prompt not yet configured.
 4. **Airbnb / Viator adapters**: not implemented.
 5. **API-style command names**: current names (`detail`, `pricing`) are terse — see `docs/api-renaming-proposal.md` if/when we migrate.
