@@ -4,17 +4,8 @@ import {
   type Platform,
 } from '@/lib/data';
 import { KpiCard } from '@/components/dashboard/kpi-card';
-import { PlatformBadge } from '@/components/dashboard/platform-badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { fmtDate, fmtDuration, fmtNum, priceRange } from '@/lib/format';
 import { PackagesFilters } from './filters';
+import { PackagesTable } from './packages-table';
 
 export const metadata = { title: 'Packages — CSI' };
 export const dynamic = 'force-dynamic';
@@ -83,81 +74,13 @@ export default async function PackagesPage({
         defaultActivity={sp.activity}
       />
 
-      {rows.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200/80 bg-white p-12 text-center text-sm text-zinc-500">
-          {all.length === 0 ? 'No packages ingested yet.' : 'No packages match the filter.'}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-zinc-200/80 bg-white overflow-hidden">
-          <Table className="table-fixed">
-            <TableHeader>
-              <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50">
-                <TableHead className="w-[88px]">Platform</TableHead>
-                <TableHead className="w-[110px]">POI</TableHead>
-                <TableHead className="w-[140px]">Activity ID</TableHead>
-                <TableHead>Package</TableHead>
-                <TableHead className="w-[80px]">Tour</TableHead>
-                <TableHead className="w-[80px]">Group</TableHead>
-                <TableHead className="w-[64px]">Meals</TableHead>
-                <TableHead className="w-[120px]">Languages</TableHead>
-                <TableHead className="w-[100px]">Departure</TableHead>
-                <TableHead className="w-[80px] text-right">Duration</TableHead>
-                <TableHead className="w-[64px] text-right">SKUs</TableHead>
-                <TableHead className="w-[140px] text-right">USD range</TableHead>
-                <TableHead className="w-[100px] text-right">Last</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell><PlatformBadge platform={r.platform} /></TableCell>
-                  <TableCell className="text-zinc-700 truncate" title={r.poi ?? ''}>
-                    {r.poi ?? '—'}
-                  </TableCell>
-                  <TableCell className="overflow-hidden">
-                    <a
-                      href={`?${activityHref(sp, r)}`}
-                      className="font-mono text-xs text-blue-600 hover:underline tabular-nums"
-                      title={r.activity_title ?? ''}
-                    >
-                      {r.platform_product_id ?? `#${r.activity_id}`}
-                    </a>
-                    <div className="truncate text-[11px] text-zinc-400" title={r.activity_title ?? ''}>
-                      {r.activity_title ?? '—'}
-                    </div>
-                  </TableCell>
-                  <TableCell className="overflow-hidden">
-                    <div className="truncate font-medium" title={r.package_title ?? ''}>
-                      {r.package_title ?? '(untitled package)'}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-zinc-700">{r.tour_type || '—'}</TableCell>
-                  <TableCell className="text-xs text-zinc-700">{r.group_size || '—'}</TableCell>
-                  <TableCell className="text-xs text-zinc-700">{mealsLabel(r.meals)}</TableCell>
-                  <TableCell className="text-xs text-zinc-700 truncate" title={langSummary(r.available_languages)}>
-                    {langSummary(r.available_languages)}
-                  </TableCell>
-                  <TableCell className="text-xs text-zinc-700 truncate">
-                    {r.departure_city || '—'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs text-zinc-600">
-                    {fmtDuration(r.duration_minutes)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtNum(r.sku_count)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-medium">
-                    {priceRange(r.min_price_usd, r.max_price_usd)}
-                  </TableCell>
-                  <TableCell className="text-right text-xs tabular-nums text-zinc-500">
-                    {fmtDate(r.last_checked_at)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <PackagesTable
+        rows={rows}
+        sp={sp}
+        emptyMessage={
+          all.length === 0 ? 'No packages ingested yet.' : 'No packages match the filter.'
+        }
+      />
     </div>
   );
 }
@@ -186,33 +109,4 @@ function uniqActivities(rows: PackageWithStats[]): ActivityOption[] {
     map.set(key, { key, label: `${id} — ${title}`, platform: r.platform });
   }
   return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
-}
-
-function activityHref(
-  sp: { platform?: Platform; poi?: string; activity?: string },
-  r: PackageWithStats,
-): string {
-  const next = new URLSearchParams();
-  if (sp.platform) next.set('platform', sp.platform);
-  if (sp.poi) next.set('poi', sp.poi);
-  next.set('activity', activityKey(r));
-  return next.toString();
-}
-
-function mealsLabel(m: PackageWithStats['meals']): string {
-  if (m === true) return 'yes';
-  if (m === false) return 'no';
-  return '—';
-}
-
-function langSummary(v: PackageWithStats['available_languages']): string {
-  if (!v) return '—';
-  let arr: unknown = v;
-  if (typeof v === 'string') {
-    try { arr = JSON.parse(v); } catch { return v; }
-  }
-  if (!Array.isArray(arr)) return '—';
-  if (arr.length === 0) return '—';
-  if (arr.length <= 2) return arr.join(', ');
-  return `${arr.slice(0, 2).join(', ')} +${arr.length - 2}`;
 }
