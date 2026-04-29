@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { PlatformLogo } from '@/components/dashboard/platform-logo';
 import type { Platform } from '@/lib/data';
+import type { ActivityOption } from './page';
 
 const LABEL: Record<Platform | 'all', string> = {
   all: 'All',
@@ -34,14 +35,21 @@ const ACTIVE: Record<Platform, string> = {
 export function PackagesFilters({
   platforms,
   pois,
+  activities,
   defaultPlatform,
   defaultPoi,
+  defaultActivity,
 }: {
   platforms: Platform[];
   pois: string[];
+  activities: ActivityOption[];
   defaultPlatform?: Platform;
   defaultPoi?: string;
+  defaultActivity?: string;
 }) {
+  const filteredActivities = defaultPlatform
+    ? activities.filter((a) => a.platform === defaultPlatform)
+    : activities;
   const router = useRouter();
   const sp = useSearchParams();
   const [, startTransition] = useTransition();
@@ -62,7 +70,7 @@ export function PackagesFilters({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <Pill label="All" active={selected === 'all'} onClick={() => update({ platform: null })} />
+        <Pill label="All" active={selected === 'all'} onClick={() => update({ platform: null, activity: null })} />
         {platforms.map((p) => (
           <Pill
             key={p}
@@ -70,7 +78,7 @@ export function PackagesFilters({
             icon={<PlatformLogo platform={p} size={14} />}
             activeClass={ACTIVE[p]}
             active={selected === p}
-            onClick={() => update({ platform: p })}
+            onClick={() => update({ platform: p, activity: null })}
           />
         ))}
       </div>
@@ -87,6 +95,20 @@ export function PackagesFilters({
             <SelectItem value="all">All POIs</SelectItem>
             {pois.map((p) => (
               <SelectItem key={p} value={p}>{p}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={defaultActivity ?? 'all'}
+          onValueChange={(v) => update({ activity: v })}
+        >
+          <SelectTrigger className="w-[320px] h-9">
+            <SelectValue placeholder="Group by activity" />
+          </SelectTrigger>
+          <SelectContent className="max-h-80">
+            <SelectItem value="all">All activities</SelectItem>
+            {filteredActivities.map((a) => (
+              <SelectItem key={a.key} value={a.key}>{a.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

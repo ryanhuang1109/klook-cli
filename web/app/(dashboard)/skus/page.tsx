@@ -21,19 +21,23 @@ const PLATFORMS: Platform[] = ['klook', 'trip', 'getyourguide', 'kkday', 'airbnb
 export default async function SkusPage({
   searchParams,
 }: {
-  searchParams: Promise<{ platform?: Platform; poi?: string; page?: string }>;
+  searchParams: Promise<{ platform?: Platform; poi?: string; activity?: string; page?: string }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
   const all = readPlanningRows();
-  const filtered = filter(all, sp.platform, sp.poi);
+  const filtered = sortByActivity(filter(all, sp.platform, sp.poi, sp.activity));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * PAGE_SIZE;
   const rows = filtered.slice(start, start + PAGE_SIZE);
 
   const allPois = uniqSorted(all.map((r) => r.main_poi).filter(Boolean));
+  const platformScoped = sp.platform
+    ? all.filter((r) => otaToPlatform(r.ota) === sp.platform)
+    : all;
+  const activityOptions = uniqActivities(platformScoped);
   const lastChecked = pickLatest(all);
 
   return (
@@ -64,8 +68,10 @@ export default async function SkusPage({
       <SkusFilters
         platforms={PLATFORMS}
         pois={allPois}
+        activities={activityOptions}
         defaultPlatform={sp.platform}
         defaultPoi={sp.poi}
+        defaultActivity={sp.activity}
       />
 
       {filtered.length === 0 ? (
@@ -77,12 +83,14 @@ export default async function SkusPage({
       ) : (
         <>
           <div className="rounded-xl border border-zinc-200/80 bg-white overflow-x-auto">
-            <Table className="min-w-[2400px]">
+            <Table className="min-w-[2600px]">
               <TableHeader>
                 <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50">
                   <TableHead className="w-[110px] sticky left-0 bg-zinc-50/50">OTA</TableHead>
                   <TableHead className="w-[120px]">Main POI</TableHead>
-                  <TableHead className="w-[280px]">Activity</TableHead>
+                  <TableHead className="w-[120px]">Activity ID</TableHead>
+                  <TableHead className="w-[260px]">Activity</TableHead>
+                  <TableHead className="w-[220px]">Package</TableHead>
                   <TableHead className="w-[100px]">Language</TableHead>
                   <TableHead className="w-[90px]">Tour</TableHead>
                   <TableHead className="w-[90px]">Group</TableHead>
@@ -107,11 +115,22 @@ export default async function SkusPage({
                     </TableCell>
                     <TableCell className="text-zinc-700">{r.main_poi || '—'}</TableCell>
                     <TableCell className="overflow-hidden">
-                      <div className="truncate" title={r.activity_title}>
+                      <a
+                        href={`?${activityHref(sp, r)}`}
+                        className="font-mono text-xs text-blue-600 hover:underline tabular-nums truncate block"
+                        title={r.product_id}
+                      >
+                        {r.product_id || '—'}
+                      </a>
+                    </TableCell>
+                    <TableCell className="overflow-hidden">
+                      <div className="truncate text-sm" title={r.activity_title}>
                         {r.activity_title || '—'}
                       </div>
-                      <div className="truncate text-xs text-zinc-400 font-mono">
-                        {r.product_id}
+                    </TableCell>
+                    <TableCell className="overflow-hidden">
+                      <div className="truncate text-xs text-zinc-700" title={r.package}>
+                        {r.package || '—'}
                       </div>
                     </TableCell>
                     <TableCell className="text-xs">{r.language || '—'}</TableCell>
@@ -174,6 +193,7 @@ function filter(
   rows: PlanningRow[],
   platform?: Platform,
   poi?: string,
+  activity?: string,
 ): PlanningRow[] {
   return rows.filter((r) => {
     if (platform) {
@@ -181,12 +201,51 @@ function filter(
       if (p !== platform) return false;
     }
     if (poi && r.main_poi !== poi) return false;
+    if (activity && r.product_id !== activity) return false;
     return true;
+  });
+}
+
+function sortByActivity(rows: PlanningRow[]): PlanningRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.product_id !== b.product_id) {
+      return (a.product_id ?? '').localeCompare(b.product_id ?? '');
+    }
+    if (a.travel_date !== b.travel_date) {
+      return (a.travel_date ?? '').localeCompare(b.travel_date ?? '');
+    }
+    return (a.language ?? '').localeCompare(b.language ?? '');
   });
 }
 
 function uniqSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
+export type SkuActivityOption = { id: string; label: string };
+
+function uniqActivities(rows: PlanningRow[]): SkuActivityOption[] {
+  const map = new Map<string, SkuActivityOption>();
+  for (const r of rows) {
+    if (!r.product_id) continue;
+    if (map.has(r.product_id)) continue;
+    map.set(r.product_id, {
+      id: r.product_id,
+      label: `${r.product_id} — ${r.activity_title || '(untitled)'}`,
+    });
+  }
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function activityHref(
+  sp: { platform?: Platform; poi?: string; activity?: string; page?: string },
+  r: PlanningRow,
+): string {
+  const next = new URLSearchParams();
+  if (sp.platform) next.set('platform', sp.platform);
+  if (sp.poi) next.set('poi', sp.poi);
+  if (r.product_id) next.set('activity', r.product_id);
+  return next.toString();
 }
 
 function pickLatest(rows: PlanningRow[]): string | null {

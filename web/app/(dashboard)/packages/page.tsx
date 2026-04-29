@@ -24,17 +24,26 @@ const PLATFORMS: Platform[] = ['klook', 'trip', 'getyourguide', 'kkday', 'airbnb
 export default async function PackagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ platform?: Platform; poi?: string }>;
+  searchParams: Promise<{ platform?: Platform; poi?: string; activity?: string }>;
 }) {
   const sp = await searchParams;
   const all = await listPackagesWithStats();
-  const rows = all.filter((r) => {
-    if (sp.platform && r.platform !== sp.platform) return false;
-    if (sp.poi && r.poi !== sp.poi) return false;
-    return true;
-  });
+  const rows = all
+    .filter((r) => {
+      if (sp.platform && r.platform !== sp.platform) return false;
+      if (sp.poi && r.poi !== sp.poi) return false;
+      if (sp.activity && activityKey(r) !== sp.activity) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const ka = activityKey(a);
+      const kb = activityKey(b);
+      if (ka === kb) return (a.package_title ?? '').localeCompare(b.package_title ?? '');
+      return ka.localeCompare(kb);
+    });
 
   const allPois = uniq(all.map((r) => r.poi).filter(Boolean) as string[]).sort();
+  const activityOptions = uniqActivities(all);
   const totalSkus = rows.reduce((a, r) => a + r.sku_count, 0);
   const withPrice = rows.filter((r) => r.min_price_usd != null);
   const avgMin =
@@ -68,8 +77,10 @@ export default async function PackagesPage({
       <PackagesFilters
         platforms={PLATFORMS}
         pois={allPois}
+        activities={activityOptions}
         defaultPlatform={sp.platform}
         defaultPoi={sp.poi}
+        defaultActivity={sp.activity}
       />
 
       {rows.length === 0 ? (
@@ -83,7 +94,8 @@ export default async function PackagesPage({
               <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50">
                 <TableHead className="w-[88px]">Platform</TableHead>
                 <TableHead className="w-[110px]">POI</TableHead>
-                <TableHead>Activity / Package</TableHead>
+                <TableHead className="w-[140px]">Activity ID</TableHead>
+                <TableHead>Package</TableHead>
                 <TableHead className="w-[80px]">Tour</TableHead>
                 <TableHead className="w-[80px]">Group</TableHead>
                 <TableHead className="w-[64px]">Meals</TableHead>
@@ -103,11 +115,20 @@ export default async function PackagesPage({
                     {r.poi ?? '—'}
                   </TableCell>
                   <TableCell className="overflow-hidden">
+                    <a
+                      href={`?${activityHref(sp, r)}`}
+                      className="font-mono text-xs text-blue-600 hover:underline tabular-nums"
+                      title={r.activity_title ?? ''}
+                    >
+                      {r.platform_product_id ?? `#${r.activity_id}`}
+                    </a>
+                    <div className="truncate text-[11px] text-zinc-400" title={r.activity_title ?? ''}>
+                      {r.activity_title ?? '—'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="overflow-hidden">
                     <div className="truncate font-medium" title={r.package_title ?? ''}>
                       {r.package_title ?? '(untitled package)'}
-                    </div>
-                    <div className="truncate text-xs text-zinc-400" title={r.activity_title ?? ''}>
-                      {r.activity_title ?? '—'}
                     </div>
                   </TableCell>
                   <TableCell className="text-xs text-zinc-700">{r.tour_type || '—'}</TableCell>
@@ -143,6 +164,39 @@ export default async function PackagesPage({
 
 function uniq(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function activityKey(r: PackageWithStats): string {
+  return r.platform_product_id ?? `#${r.activity_id}`;
+}
+
+export type ActivityOption = {
+  key: string;
+  label: string;
+  platform: Platform;
+};
+
+function uniqActivities(rows: PackageWithStats[]): ActivityOption[] {
+  const map = new Map<string, ActivityOption>();
+  for (const r of rows) {
+    const key = activityKey(r);
+    if (map.has(key)) continue;
+    const id = r.platform_product_id ?? `#${r.activity_id}`;
+    const title = r.activity_title ?? '(untitled)';
+    map.set(key, { key, label: `${id} — ${title}`, platform: r.platform });
+  }
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function activityHref(
+  sp: { platform?: Platform; poi?: string; activity?: string },
+  r: PackageWithStats,
+): string {
+  const next = new URLSearchParams();
+  if (sp.platform) next.set('platform', sp.platform);
+  if (sp.poi) next.set('poi', sp.poi);
+  next.set('activity', activityKey(r));
+  return next.toString();
 }
 
 function mealsLabel(m: PackageWithStats['meals']): string {
