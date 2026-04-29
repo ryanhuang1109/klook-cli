@@ -73,6 +73,52 @@ describe('runScan', () => {
     expect(r.failed[0].reason).toBe('id-not-extractable');
   });
 
+  it('retries once on transient error then succeeds', async () => {
+    vi.spyOn(ingest, 'runSearch').mockReturnValue([
+      { title: 'A', url: 'https://www.kkday.com/en/product/1', review_count: '10' },
+    ] as any);
+    let attempts = 0;
+    vi.spyOn(ingest, 'ingestFromDetail').mockImplementation(async () => {
+      attempts++;
+      if (attempts === 1) throw new Error('Page navigated or closed during scrape');
+      return {} as any;
+    });
+    // Speed up the 4s sleep
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const fakeDb: any = { logSearchRun: vi.fn() };
+    const promise = runScan(fakeDb, {
+      platform: 'kkday', poi: 'mt fuji', keyword: 'mt fuji', limit: 1,
+    });
+    await vi.runAllTimersAsync();
+    const r = await promise;
+
+    expect(attempts).toBe(2);
+    expect(r.succeeded).toBe(1);
+    expect(r.failed).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
+  it('does NOT retry on non-transient error', async () => {
+    vi.spyOn(ingest, 'runSearch').mockReturnValue([
+      { title: 'A', url: 'https://www.kkday.com/en/product/1', review_count: '10' },
+    ] as any);
+    let attempts = 0;
+    vi.spyOn(ingest, 'ingestFromDetail').mockImplementation(async () => {
+      attempts++;
+      throw new Error('Activity not found in DB');
+    });
+
+    const fakeDb: any = { logSearchRun: vi.fn() };
+    const r = await runScan(fakeDb, {
+      platform: 'kkday', poi: 'mt fuji', keyword: 'mt fuji', limit: 1,
+    });
+
+    expect(attempts).toBe(1);   // exactly one attempt
+    expect(r.succeeded).toBe(0);
+    expect(r.failed).toHaveLength(1);
+  });
+
   it('writes a search_runs log row', async () => {
     vi.spyOn(ingest, 'runSearch').mockReturnValue([
       { title: 'A', url: 'https://www.kkday.com/en/product/1', review_count: '10' },

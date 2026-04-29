@@ -65,18 +65,39 @@ export async function runScan(db: ToursDB, opts: ScanOptions): Promise<ScanResul
     opts.onProgress?.(
       `${opts.platform}/${activityId} (${parseReviewCount(hit.review_count).toLocaleString()} reviews) — ${(hit.title ?? '').slice(0, 60)}`,
     );
-    try {
-      await ingestFromDetail(db, {
-        platform: opts.platform,
-        activityId,
-        poi: opts.poi,
-        canonicalUrl: url,
-        captureScreenshot: opts.captureScreenshot,
-        sessionId: opts.sessionId,
-      });
-      succeeded++;
-    } catch (err) {
-      failed.push({ url, reason: (err as Error).message.slice(0, 200) });
+    // Transient browser-bridge failures (e.g. "navigated or closed",
+    // "Target closed") are retried once after a 4s delay, mirroring the
+    // same pattern used by ingestBySearch. Anything non-transient or that
+    // fails on the second attempt is recorded in `failed` immediately.
+    const TRANSIENT_RE = /navigated or closed|target closed|session closed|ERR_NETWORK|Execution context was destroyed/i;
+    const maxAttempts = 2;
+    let lastErr: string | null = null;
+    let done = false;
+
+    for (let attempt = 1; attempt <= maxAttempts && !done; attempt++) {
+      try {
+        await ingestFromDetail(db, {
+          platform: opts.platform,
+          activityId,
+          poi: opts.poi,
+          canonicalUrl: url,
+          captureScreenshot: opts.captureScreenshot,
+          sessionId: opts.sessionId,
+        });
+        succeeded++;
+        done = true;
+      } catch (err) {
+        lastErr = (err as Error).message.slice(0, 200);
+        if (attempt < maxAttempts && TRANSIENT_RE.test(lastErr)) {
+          opts.onProgress?.(
+            `  ↻ transient error on ${opts.platform}/${activityId}, retrying in 4s…`,
+          );
+          await new Promise((r) => setTimeout(r, 4000));
+          continue;
+        }
+        failed.push({ url, reason: lastErr });
+        done = true;
+      }
     }
   }
 
