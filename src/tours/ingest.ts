@@ -52,7 +52,7 @@ export function runSearch(
  * Extract a numeric review count from the various string shapes search APIs
  * return — "29.2K", "1,234 reviews", "(539)", "" → number or 0 when unparseable.
  */
-function parseReviewCount(raw: string | undefined): number {
+export function parseReviewCount(raw: string | undefined): number {
   if (!raw) return 0;
   const m = raw.replace(/,/g, '').match(/([\d.]+)\s*([kKmM])?/);
   if (!m) return 0;
