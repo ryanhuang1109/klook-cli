@@ -484,11 +484,11 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
     },
 
     getActivity(id) {
-      return one<Activity>(`SELECT * FROM activities WHERE id = ?`, [id]);
+      return one<Activity>(`SELECT ${ACTIVITY_COLS.join(', ')} FROM activities WHERE id = ?`, [id]);
     },
 
     getActivityByUrl(url) {
-      return one<Activity>(`SELECT * FROM activities WHERE canonical_url = ?`, [url]);
+      return one<Activity>(`SELECT ${ACTIVITY_COLS.join(', ')} FROM activities WHERE canonical_url = ?`, [url]);
     },
 
     listActivities(filters = {}) {
@@ -502,7 +502,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
         where.push('poi = ?');
         params.push(filters.poi);
       }
-      const sql = `SELECT * FROM activities ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_scraped_at DESC`;
+      const sql = `SELECT ${ACTIVITY_COLS.join(', ')} FROM activities ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_scraped_at DESC`;
       return all<Activity>(sql, params);
     },
 
@@ -697,7 +697,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
 
     dumpForSync(opts = {}) {
       const since = opts.since ?? null;
-      const activities = all<any>(`SELECT * FROM activities`);
+      const activities = all<any>(`SELECT ${ACTIVITY_COLS.join(', ')} FROM activities`);
       const packages = all<any>(`SELECT * FROM packages`);
       const skus = all<any>(`SELECT * FROM skus`);
       const observations = since
