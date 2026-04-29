@@ -47,5 +47,45 @@ export function urlForLanguage(platform: Platform, url: string, lang: string): s
  * `language` would silently no-op.
  */
 export function platformSupportsLanguageUrl(platform: Platform): boolean {
-  return platform === 'getyourguide';
+  return platform === 'getyourguide' || platform === 'airbnb';
+}
+
+/**
+ * Default locale to apply when caller didn't specify one. Used by adapters
+ * that prefer English data even when the Browser Bridge cookie is set to a
+ * different locale. Returns null when the platform should leave URLs alone
+ * (cookie-only locale, no opinion).
+ */
+export function defaultLanguageForPlatform(platform: Platform): string | null {
+  // Airbnb: cookie pins the locale and we have no enforced way to set it
+  // from CLI, so the URL param ?locale=en-US is the safest default. Verified
+  // against airbnb experience pages — the param overrides the cookie hint
+  // for that single navigation.
+  if (platform === 'airbnb') return 'en-US';
+  return null;
+}
+
+/**
+ * Apply the platform's default locale URL transform when the URL doesn't
+ * already carry a locale param. No-op when the URL already has a hint
+ * (caller's choice wins) or when the platform has no default policy.
+ */
+export function applyDefaultLanguage(platform: Platform, url: string): string {
+  if (!url.startsWith('http')) return url;
+  const lang = defaultLanguageForPlatform(platform);
+  if (!lang) return url;
+  try {
+    const u = new URL(url);
+    if (platform === 'airbnb' && !u.searchParams.has('locale')) {
+      u.searchParams.set('locale', lang);
+      return u.toString();
+    }
+    if (platform === 'getyourguide' && !u.searchParams.has('lang')) {
+      // No default for GYG today — coverage is per-listing, not per-call.
+      return url;
+    }
+  } catch {
+    /* malformed URL — fall through */
+  }
+  return url;
 }

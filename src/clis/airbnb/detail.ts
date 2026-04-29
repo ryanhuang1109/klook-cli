@@ -284,9 +284,23 @@ cli({
     if (!input) throw new Error('Experience ID or URL is required');
 
     const experienceId = parseExperienceId(input);
-    const url = input.startsWith('http')
+    const baseUrl = input.startsWith('http')
       ? input
       : `https://www.airbnb.com/experiences/${experienceId}`;
+
+    // Default to English unless the caller has already pinned a locale.
+    // The Browser Bridge cookie often defaults to whatever locale the
+    // operator last browsed in (zh-TW, ja, etc.), which would otherwise
+    // produce localised titles / descriptions in our DB. Verified that
+    // ?locale=en-US overrides the cookie hint for the page navigation.
+    let url = baseUrl;
+    try {
+      const u = new URL(baseUrl);
+      if (!u.searchParams.has('locale')) {
+        u.searchParams.set('locale', 'en-US');
+        url = u.toString();
+      }
+    } catch { /* malformed URL — fall back to raw input */ }
 
     await page.goto(url);
     // Airbnb hydrates the booking widget after initial render; wait + scroll.

@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import type { ToursDB } from './db.js';
 import type { Platform, PricingRunRaw, PricingRowRaw } from './types.js';
 import { normalizePricingRun } from './normalize.js';
-import { urlForLanguage } from './url-locale.js';
+import { urlForLanguage, applyDefaultLanguage } from './url-locale.js';
 
 function stripOpencliNoise(output: string): string {
   return output
@@ -299,10 +299,18 @@ export async function ingestPricing(
 
   // When a language is specified, rewrite URL-shaped activity ids to that
   // locale so the opencli adapter renders the language-specific package
-  // set. Bare ids fall through unchanged.
-  const opencliArg = opts.language && opts.activityId.startsWith('http')
-    ? urlForLanguage(opts.platform, opts.activityId, opts.language)
-    : opts.activityId;
+  // set. Otherwise apply the platform's default-language policy (e.g.
+  // airbnb defaults to ?locale=en-US so we don't end up with mixed-locale
+  // descriptions when the Browser Bridge cookie isn't en-US). Bare ids
+  // fall through unchanged.
+  let opencliArg: string;
+  if (opts.activityId.startsWith('http')) {
+    opencliArg = opts.language
+      ? urlForLanguage(opts.platform, opts.activityId, opts.language)
+      : applyDefaultLanguage(opts.platform, opts.activityId);
+  } else {
+    opencliArg = opts.activityId;
+  }
   const raw = runPricingRaw(opts.platform, opencliArg, opts.days ?? 7);
 
   const snapPath = snapshotPath(snapshotDir, opts.platform, opts.activityId);
@@ -446,10 +454,17 @@ export async function ingestFromDetail(
   const baseDetailArg = opts.canonicalUrl?.startsWith('http')
     ? opts.canonicalUrl
     : opts.activityId;
-  // Locale rewrite (no-op for platforms we haven't implemented yet).
-  const detailArg = opts.language && baseDetailArg.startsWith('http')
-    ? urlForLanguage(opts.platform, baseDetailArg, opts.language)
-    : baseDetailArg;
+  // Locale rewrite. Caller's language hint wins; otherwise apply the
+  // platform's default-language policy (airbnb → en-US so descriptions
+  // come back in English even under a zh-TW Browser Bridge cookie).
+  let detailArg: string;
+  if (baseDetailArg.startsWith('http')) {
+    detailArg = opts.language
+      ? urlForLanguage(opts.platform, baseDetailArg, opts.language)
+      : applyDefaultLanguage(opts.platform, baseDetailArg);
+  } else {
+    detailArg = baseDetailArg;
+  }
 
   const output = execFileSync(
     'opencli',

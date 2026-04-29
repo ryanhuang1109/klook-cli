@@ -315,9 +315,22 @@ cli({
     }
 
     const experienceId = parseExperienceId(input);
-    const url = input.startsWith('http')
+    const baseUrl = input.startsWith('http')
       ? input
       : `https://www.airbnb.com/experiences/${experienceId}`;
+
+    // Default to ?locale=en-US (overrides the Browser Bridge cookie hint
+    // for this navigation only) so prices come back with English package
+    // labels regardless of what locale the cookie is pinned to. Caller
+    // can pass an explicit ?locale= in the URL to opt out.
+    let url = baseUrl;
+    try {
+      const u = new URL(baseUrl);
+      if (!u.searchParams.has('locale')) {
+        u.searchParams.set('locale', 'en-US');
+        url = u.toString();
+      }
+    } catch { /* malformed URL — fall back to raw input */ }
 
     await page.goto(url);
     // Airbnb hydrates lazily; the booking widget needs time to render.
