@@ -43,6 +43,20 @@ function stableSKUId(packageId: string, travelDate: string): string {
   return `${packageId}:${travelDate}`;
 }
 
+function uniqJoin(parts: (string | null | undefined)[], sep: string): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const v = (p ?? '').trim();
+    if (!v) continue;
+    const key = v.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out.join(sep);
+}
+
 function parsePrice(raw: string): number | null {
   if (!raw) return null;
   const cleaned = String(raw).replace(/[^\d.]/g, '');
@@ -284,9 +298,7 @@ export function normalizePricingRun(
     const rawPkgKey =
       row.package_id || row.sku_id || `${row.package_name || 'pkg'}`;
     const pkgId = stablePackageId(opts.platform, productId, rawPkgKey);
-    const pkgTitleSource = [row.group_title, row.package_name]
-      .filter(Boolean)
-      .join(' — ');
+    const pkgTitleSource = uniqJoin([row.group_title, row.package_name], ' — ');
 
     if (!packages.has(pkgId)) {
       const activityTitle = raw.title || row.activity_title || '';
