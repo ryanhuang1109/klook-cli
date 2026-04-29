@@ -32,8 +32,50 @@ describe('is_pinned column', () => {
   });
 
   it('migration adds the column when opening a DB created without it', async () => {
-    const db = await openDB(dbPath);
-    db.close();
+    // Build a legacy DB (using sql.js directly) that has the activities table
+    // but WITHOUT is_pinned — exactly as it existed before the migration was added.
+    const sqljs = await import('sql.js');
+    const initSqlJs = (sqljs as any).default;
+    const SQL = await initSqlJs();
+    const legacyDb = new SQL.Database();
+    legacyDb.run(`
+      CREATE TABLE activities (
+        id TEXT PRIMARY KEY,
+        platform TEXT NOT NULL,
+        platform_product_id TEXT NOT NULL,
+        canonical_url TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        supplier TEXT,
+        poi TEXT,
+        duration_minutes INTEGER,
+        departure_city TEXT,
+        rating REAL,
+        review_count INTEGER,
+        order_count INTEGER,
+        description TEXT,
+        cancellation_policy TEXT,
+        raw_extras_json TEXT NOT NULL DEFAULT '{}',
+        first_scraped_at TEXT NOT NULL,
+        last_scraped_at TEXT NOT NULL,
+        review_status TEXT NOT NULL DEFAULT 'unverified',
+        review_note TEXT
+        -- no is_pinned column
+      );
+    `);
+
+    // Sanity-check: legacy DB really lacks is_pinned.
+    const stmt = legacyDb.prepare(`PRAGMA table_info(activities)`);
+    const legacyCols: string[] = [];
+    while (stmt.step()) legacyCols.push((stmt.getAsObject() as any).name);
+    stmt.free();
+    expect(legacyCols).not.toContain('is_pinned');
+
+    // Persist to the temp path our openDB() will read.
+    const fs = await import('node:fs');
+    fs.writeFileSync(dbPath, Buffer.from(legacyDb.export()));
+    legacyDb.close();
+
+    // Open via production openDB — migration block should ALTER TABLE ADD COLUMN.
     const db2 = await openDB(dbPath);
     expect(db2.rawColumns('activities')).toContain('is_pinned');
     db2.close();
