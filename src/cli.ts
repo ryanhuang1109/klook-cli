@@ -444,6 +444,15 @@ toursCmd
   });
 
 toursCmd
+  .command('parse-slash-args')
+  .description('(internal) Parse /opencli-<platform> args. Returns JSON.')
+  .argument('[input...]', 'raw arg string (omit to get the ask-for-both prompt)')
+  .action(async (input: string[]) => {
+    const { parseSlashArgs } = await import('./tours/slash-arg-parser.js');
+    console.log(JSON.stringify(parseSlashArgs((input ?? []).join(' '))));
+  });
+
+toursCmd
   .command('generate-report')
   .alias('report')
   .description('Generate HTML summary report (coverage, completeness, recent rows)')
