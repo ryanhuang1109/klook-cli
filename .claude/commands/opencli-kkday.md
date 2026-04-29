@@ -1,24 +1,50 @@
 ---
-description: Run an opencli kkday task — scoped to KKday only (for skill owners testing their platform)
-argument-hint: [product-id | "keyword" | --poi <name>] [--csv | --ingest]
+description: Run an opencli kkday scan/pricing/all task on a POI
+argument-hint: <poi> <scan|pricing|all>   (alias: detail = scan)
 ---
 
-Invoke the `opencli-kkday` skill and operate **only on KKday** for this turn.
+Invoke the `opencli-kkday` skill scoped to kkday.
 
-Pre-flight: `opencli doctor` — KKday requires Browser Bridge. KKday's first request after cold bridge may return skeletal page; retry-once is typical.
+**Input contract:** `<poi> <mode>` where mode is one of `scan | pricing | all`.
+The token `detail` is accepted as an alias for `scan`.
 
-**Argument interpretation**:
+**Step 1 — Parse args:**
+```bash
+node dist/cli.js tours parse-slash-args $ARGUMENTS
+```
 
-1. **`--poi <name>`** → `list-pois` → use POI keywords to search.
-2. **Numeric ID** (e.g. `2247`) → single-product mode. Ask which: `get-activity` / `get-packages` / `get-pricing-matrix`.
-3. **Quoted keyword phrase** → `opencli kkday search-activities "<phrase>" --limit 5 -f json`.
-4. **Empty** → cheat-sheet.
+Branch on the JSON result:
 
-**Output-format flags**:
-- `--csv` → `-f csv` on final call
-- `--ingest` → `tours ingest-pricing kkday <id>` + `tours export-csv`
-- Default → JSON
+- `kind: "ok"` → continue with the `poi` and `mode` returned.
+- `kind: "ask"` → present `question` + numbered `choices` to the user and STOP. Do **not** pick a default.
+- `kind: "error"` → print `message` and STOP.
 
-KKday `get-pricing-matrix` gives **minimum across sub-SKUs** per package/date, not per-SKU prices. No `trending`.
+**Step 2 — Pre-flight:** `opencli doctor`.
+Confirm the Browser Bridge cookie locale is `en-US` (per memory `feedback_browser_bridge_en_us`). Adapters are written against en-US DOM and zh-TW silently breaks them.
+
+**Step 3 — Dispatch:**
+
+| mode    | command                                                              |
+|---------|----------------------------------------------------------------------|
+| scan    | `node dist/cli.js tours scan --platform kkday --poi "<poi>"`         |
+| pricing | `node dist/cli.js tours pricing --platform kkday --poi "<poi>"`      |
+| all     | `tours scan ...` then `tours pin --top 5` then `tours pricing ...`   |
+
+**Step 4 — Handle pricing's "no_pinned" branch:**
+
+If `tours pricing` returns `"no_pinned": true` (exit code 2), **do not
+auto-fallback**. Surface the choice to the user verbatim:
+
+```
+No pinned activities for kkday × <poi>. Pick:
+  1) /opencli-kkday <poi> all
+  2) /opencli-kkday <poi> scan         (then pin later)
+  3) tours pin --platform kkday --poi <poi> --top 5
+  4) cancel
+```
+
+**kkday-specific quirks** (see `opencli-kkday` skill for full troubleshooting):
+- `get-pricing-matrix` gives **minimum across sub-SKUs** per package/date, not per-SKU prices. No `trending`.
+- KKday's first request after cold bridge may return skeletal page; retry-once is typical.
 
 $ARGUMENTS
