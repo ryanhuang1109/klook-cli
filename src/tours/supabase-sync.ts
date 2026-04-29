@@ -147,6 +147,7 @@ export async function verifySupabaseSync(db: ToursDB): Promise<{
   sqlite: number;
   supabase: number | null;
   ok: boolean;
+  error?: string;
 }[]> {
   const client = getSupabaseClient();
   const dump = db.dumpForSync();
@@ -160,13 +161,13 @@ export async function verifySupabaseSync(db: ToursDB): Promise<{
     ['search_runs', dump.searchRuns.length],
     ['coverage_runs', dump.coverageRuns.length],
   ];
-  const out: { table: string; sqlite: number; supabase: number | null; ok: boolean }[] = [];
+  const out: { table: string; sqlite: number; supabase: number | null; ok: boolean; error?: string }[] = [];
   for (const [table, sqlite] of expected) {
     const { count, error } = await client
       .from(table)
       .select('*', { count: 'exact', head: true });
     if (error) {
-      out.push({ table, sqlite, supabase: null, ok: false });
+      out.push({ table, sqlite, supabase: null, ok: false, error: error.message });
     } else {
       const supabase = count ?? 0;
       out.push({ table, sqlite, supabase, ok: supabase >= sqlite });

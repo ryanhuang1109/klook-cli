@@ -21,10 +21,18 @@ type SqlJsStatic = any;
 type SqlJsDB = any;
 
 export interface ToursDB {
-  upsertActivity(a: Activity): void;
-  upsertPackage(p: Package): void;
-  upsertSKU(s: SKU): void;
-  appendObservation(o: SKUObservation): void;
+  /**
+   * Upsert helpers return `true` when the underlying SQLite statement
+   * actually changed a row (insert or update), `false` when it was a no-op.
+   * Callers use this to compute "real DB writes" instead of trusting
+   * `normalized.skus.length`, which masks silent normalizer/schema
+   * failures (e.g. the GYG zh-TW regression in 2026-04-29).
+   */
+  upsertActivity(a: Activity): boolean;
+  upsertPackage(p: Package): boolean;
+  upsertSKU(s: SKU): boolean;
+  /** Returns true when a new observation row was appended. */
+  appendObservation(o: SKUObservation): boolean;
 
   getActivity(id: string): Activity | null;
   getActivityByUrl(url: string): Activity | null;
@@ -389,7 +397,9 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
           a.first_scraped_at, a.last_scraped_at, a.review_status, a.review_note,
         ],
       );
+      const changed = db.getRowsModified() > 0;
       persist();
+      return changed;
     },
 
     upsertPackage(p) {
@@ -417,7 +427,9 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
           p.completeness_json,
         ],
       );
+      const changed = db.getRowsModified() > 0;
       persist();
+      return changed;
     },
 
     upsertSKU(s) {
@@ -435,7 +447,9 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
           s.currency, s.available ? 1 : 0, s.last_checked_at,
         ],
       );
+      const changed = db.getRowsModified() > 0;
       persist();
+      return changed;
     },
 
     appendObservation(o) {
@@ -444,7 +458,9 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
          VALUES (?, ?, ?, ?, ?)`,
         [o.sku_id, o.checked_at, o.price_local, o.price_usd, o.available ? 1 : 0],
       );
+      const changed = db.getRowsModified() > 0;
       persist();
+      return changed;
     },
 
     getActivity(id) {

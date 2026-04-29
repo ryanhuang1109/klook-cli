@@ -545,6 +545,20 @@ toursCmd
   });
 
 toursCmd
+  .command('preflight-locale')
+  .description('Audit Browser Bridge cookie + html lang per OTA. Adapters expect en/en-US — non-English silently breaks normalization.')
+  .option('-f, --format <fmt>', 'Output format: text, json', 'text')
+  .action(async (opts: { format?: string }) => {
+    const { cmdPreflightLocale } = await import('./tours/commands.js');
+    try {
+      await cmdPreflightLocale({ format: opts.format });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+toursCmd
   .command('verify-supabase-sync')
   .description('Compare row counts between local SQLite and Supabase')
   .option('-f, --format <fmt>', 'Output format: text, json', 'text')

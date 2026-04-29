@@ -197,13 +197,27 @@ export interface IngestOptions {
    * platforms like GYG return the package set for that language.
    */
   language?: string;
+  /**
+   * When true (default), fall back to `ingestFromDetail` automatically if the
+   * pricing scraper crashes or returns zero captured days. Set false to keep
+   * the legacy "fail loudly" behavior.
+   */
+  detailFallback?: boolean;
 }
 
 export interface IngestResult {
   activityId: string;
   platform: Platform;
+  /** Real count of SKU rows that were inserted or updated in SQLite. */
   skus_written: number;
+  /** Real count of package rows that were inserted or updated. */
   packages_written: number;
+  /** Real count of sku_observations rows appended (history table). 0 here
+   *  alongside non-zero `skus_written` is the smoking gun for the silent-
+   *  write class of bug (e.g. zh-TW cookie + GYG normalizer). */
+  observations_appended: number;
+  /** Real count of activity rows updated/inserted (1 or 0). */
+  activity_written: boolean;
   warnings: string[];
   snapshot_path: string;
 }
@@ -311,7 +325,55 @@ export async function ingestPricing(
   } else {
     opencliArg = opts.activityId;
   }
-  const raw = runPricingRaw(opts.platform, opencliArg, opts.days ?? 7);
+
+  const fallbackEnabled = opts.detailFallback !== false;
+  let raw: PricingRunRaw;
+  let pricingThrew: Error | null = null;
+  try {
+    raw = runPricingRaw(opts.platform, opencliArg, opts.days ?? 7);
+  } catch (err) {
+    if (!fallbackEnabled) throw err;
+    pricingThrew = err as Error;
+    // Stub so the auto-fallback below replaces it.
+    raw = {
+      activity_id: opts.activityId,
+      ota: opts.platform,
+      url: opts.canonicalUrl ?? '',
+      title: '',
+      days_requested: opts.days ?? 7,
+      days_captured: 0,
+      rows: [],
+      errors: [{ reason: `pricing-threw: ${(err as Error).message.slice(0, 200)}` }],
+    };
+  }
+
+  // Fallback when pricing produced nothing usable. Trip can return
+  // days_captured > 0 yet rows: [] (per-row price-parse failures), so we
+  // also look at the row count.
+  const noUsableRows = !Array.isArray(raw.rows) || raw.rows.length === 0;
+  if (fallbackEnabled && (raw.days_captured === 0 || noUsableRows)) {
+    // Pricing scraper produced no usable data — defer to ingestFromDetail.
+    // Detail fallback writes its own snapshot (`-detail.json`) so we don't
+    // duplicate the broken pricing snapshot if it exists.
+    const detailResult = await ingestFromDetail(db, {
+      platform: opts.platform,
+      activityId: opts.activityId,
+      poi: opts.poi ?? null,
+      canonicalUrl: opts.canonicalUrl,
+    });
+    const reason = pricingThrew
+      ? `pricing-threw: ${pricingThrew.message.slice(0, 160)}`
+      : raw.days_captured === 0
+        ? `pricing-empty (days_captured=0)`
+        : `pricing-no-rows (days_captured=${raw.days_captured}, rows=0)`;
+    return {
+      ...detailResult,
+      warnings: [
+        ...detailResult.warnings,
+        `auto-fallback to ingestFromDetail; ${reason}`,
+      ],
+    };
+  }
 
   const snapPath = snapshotPath(snapshotDir, opts.platform, opts.activityId);
   fs.writeFileSync(snapPath, JSON.stringify(raw, null, 2));
@@ -327,7 +389,7 @@ export async function ingestPricing(
     normalized.activity.first_scraped_at = existing.first_scraped_at;
   }
   mergeRawExtras(normalized, existing);
-  db.upsertActivity(normalized.activity);
+  const activityWritten = db.upsertActivity(normalized.activity);
 
   // Look up existing packages for this activity once, build a map by id,
   // and use it to merge language arrays before upsert. Without this, a
@@ -336,24 +398,40 @@ export async function ingestPricing(
   const priorPkgsByIdA = new Map(
     db.listPackagesForActivity(normalized.activity.id).map((p) => [p.id, p]),
   );
+  let pkgsChanged = 0;
   for (const pkg of normalized.packages.values()) {
     mergePackageLanguages(pkg as any, priorPkgsByIdA.get(pkg.id) as any);
-    db.upsertPackage(pkg);
+    if (db.upsertPackage(pkg)) pkgsChanged++;
   }
 
+  let skusChanged = 0;
   for (const sku of normalized.skus) {
-    db.upsertSKU(sku);
+    if (db.upsertSKU(sku)) skusChanged++;
   }
+  let obsAppended = 0;
   for (const obs of normalized.observations) {
-    db.appendObservation(obs);
+    if (db.appendObservation(obs)) obsAppended++;
+  }
+
+  // Surface silent normalizer/db failures: the result reports actual DB
+  // writes, not the optimistic `normalized.*.length` counters that masked
+  // the GYG zh-TW regression.
+  const warnings = [...normalized.warnings];
+  if (normalized.observations.length > 0 && obsAppended === 0) {
+    warnings.push(
+      `silent-write: normalizer produced ${normalized.observations.length} observations but 0 reached the DB. ` +
+      `Likely cause: schema/regex mismatch in normalize.ts. Inspect snapshot: ${snapPath}`,
+    );
   }
 
   return {
     activityId: normalized.activity.id,
     platform: opts.platform,
-    skus_written: normalized.skus.length,
-    packages_written: normalized.packages.size,
-    warnings: normalized.warnings,
+    skus_written: skusChanged,
+    packages_written: pkgsChanged,
+    observations_appended: obsAppended,
+    activity_written: activityWritten,
+    warnings,
     snapshot_path: snapPath,
   };
 }
@@ -618,19 +696,26 @@ export async function ingestFromDetail(
   const existing = db.getActivity(normalized.activity.id);
   if (existing) normalized.activity.first_scraped_at = existing.first_scraped_at;
   mergeRawExtras(normalized, existing);
-  db.upsertActivity(normalized.activity);
+  const activityWrittenD = db.upsertActivity(normalized.activity);
   const priorDPkgsById = new Map(
     db.listPackagesForActivity(normalized.activity.id).map((p) => [p.id, p]),
   );
+  let pkgsChangedD = 0;
   for (const pkg of normalized.packages.values()) {
     mergePackageLanguages(pkg as any, priorDPkgsById.get(pkg.id) as any);
-    db.upsertPackage(pkg);
+    if (db.upsertPackage(pkg)) pkgsChangedD++;
   }
-  for (const sku of normalized.skus) db.upsertSKU(sku);
-  for (const obs of normalized.observations) db.appendObservation(obs);
+  let skusChangedD = 0;
+  for (const sku of normalized.skus) {
+    if (db.upsertSKU(sku)) skusChangedD++;
+  }
+  let obsAppendedD = 0;
+  for (const obs of normalized.observations) {
+    if (db.appendObservation(obs)) obsAppendedD++;
+  }
 
-  execPkgs = normalized.packages.size;
-  execSkus = normalized.skus.length;
+  execPkgs = pkgsChangedD;
+  execSkus = skusChangedD;
 
   db.logExecution({
     session_id: opts.sessionId ?? null,
@@ -645,12 +730,22 @@ export async function ingestFromDetail(
     fallback_reason: agentFallbackUsed ? agentFallbackReason : null,
   });
 
+  const warningsD = [...normalized.warnings];
+  if (normalized.observations.length > 0 && obsAppendedD === 0) {
+    warningsD.push(
+      `silent-write: normalizer produced ${normalized.observations.length} observations but 0 reached the DB. ` +
+      `Inspect snapshot: ${snapPath}`,
+    );
+  }
+
   return {
     activityId: normalized.activity.id,
     platform: opts.platform,
-    skus_written: execSkus,
-    packages_written: execPkgs,
-    warnings: normalized.warnings,
+    skus_written: skusChangedD,
+    packages_written: pkgsChangedD,
+    observations_appended: obsAppendedD,
+    activity_written: activityWrittenD,
+    warnings: warningsD,
     snapshot_path: snapPath,
   };
 }
@@ -672,23 +767,40 @@ export async function ingestFromSnapshot(
     normalized.activity.first_scraped_at = existing.first_scraped_at;
   }
   mergeRawExtras(normalized, existing);
-  db.upsertActivity(normalized.activity);
+  const activityWrittenS = db.upsertActivity(normalized.activity);
   const priorSPkgsById = new Map(
     db.listPackagesForActivity(normalized.activity.id).map((p) => [p.id, p]),
   );
+  let pkgsChangedS = 0;
   for (const pkg of normalized.packages.values()) {
     mergePackageLanguages(pkg as any, priorSPkgsById.get(pkg.id) as any);
-    db.upsertPackage(pkg);
+    if (db.upsertPackage(pkg)) pkgsChangedS++;
   }
-  for (const sku of normalized.skus) db.upsertSKU(sku);
-  for (const obs of normalized.observations) db.appendObservation(obs);
+  let skusChangedS = 0;
+  for (const sku of normalized.skus) {
+    if (db.upsertSKU(sku)) skusChangedS++;
+  }
+  let obsAppendedS = 0;
+  for (const obs of normalized.observations) {
+    if (db.appendObservation(obs)) obsAppendedS++;
+  }
+
+  const warningsS = [...normalized.warnings];
+  if (normalized.observations.length > 0 && obsAppendedS === 0) {
+    warningsS.push(
+      `silent-write: normalizer produced ${normalized.observations.length} observations but 0 reached the DB. ` +
+      `Inspect snapshot: ${snapshotFile}`,
+    );
+  }
 
   return {
     activityId: normalized.activity.id,
     platform: opts.platform,
-    skus_written: normalized.skus.length,
-    packages_written: normalized.packages.size,
-    warnings: normalized.warnings,
+    skus_written: skusChangedS,
+    packages_written: pkgsChangedS,
+    observations_appended: obsAppendedS,
+    activity_written: activityWrittenS,
+    warnings: warningsS,
     snapshot_path: snapshotFile,
   };
 }

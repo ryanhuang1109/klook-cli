@@ -538,6 +538,36 @@ export async function cmdSyncToSupabase(opts: {
   }
 }
 
+export async function cmdPreflightLocale(opts: { format?: string }): Promise<void> {
+  const { auditBrowserLocales } = await import('./preflight-locale.js');
+  const rows = await auditBrowserLocales();
+  if (opts.format === 'json') {
+    console.log(JSON.stringify(rows, null, 2));
+    if (rows.some((r) => !r.ok)) process.exitCode = 2;
+    return;
+  }
+  console.log('Browser Bridge locale audit (adapters expect en / en-US):');
+  console.log(
+    `  ${'platform'.padEnd(14)} ${'cookie'.padEnd(14)} ${'html-lang'.padEnd(10)}  status`,
+  );
+  let anyBad = false;
+  for (const r of rows) {
+    const flag = r.ok ? 'OK' : 'WARN';
+    if (!r.ok) anyBad = true;
+    console.log(
+      `  ${r.platform.padEnd(14)} ${(r.cookieLocale ?? '-').padEnd(14)} ${(r.htmlLang ?? '-').padEnd(10)}  ${flag}`,
+    );
+    if (!r.ok) console.log(`    hint: ${r.hint}`);
+  }
+  if (anyBad) {
+    console.log(
+      '\nFix: invoke the `setup-browser-cookies` skill from an en-US Chrome profile, ' +
+      'or open each flagged URL in your real browser, switch to English, then re-import cookies.',
+    );
+    process.exitCode = 2;
+  }
+}
+
 export async function cmdVerifySupabaseSync(opts: { format?: string }): Promise<void> {
   loadEnv();
   const { verifySupabaseSync } = await import('./supabase-sync.js');
@@ -560,6 +590,9 @@ export async function cmdVerifySupabaseSync(opts: { format?: string }): Promise<
       console.log(
         `  ${r.table.padEnd(18)} ${String(r.sqlite).padStart(8)} ${sb.padStart(10)}  ${flag}`,
       );
+      if (r.error) {
+        console.log(`    error: ${r.error}`);
+      }
     }
     if (!allOk) process.exitCode = 2;
   } finally {
