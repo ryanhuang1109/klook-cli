@@ -99,9 +99,14 @@ export function DataTable<T>({
   return (
     <div className="rounded-xl border border-zinc-200/80 bg-white overflow-x-auto">
       <table
-        style={{ width: totalSize }}
+        style={{ width: totalSize, tableLayout: 'fixed' }}
         className={`text-sm ${tableClassName ?? ''}`.trim()}
       >
+        <colgroup>
+          {table.getVisibleLeafColumns().map((col) => (
+            <col key={col.id} style={{ width: col.getSize() }} />
+          ))}
+        </colgroup>
         <thead className="border-b border-zinc-200/70 bg-zinc-50/50">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id}>
@@ -111,7 +116,6 @@ export function DataTable<T>({
                 return (
                   <th
                     key={header.id}
-                    style={{ width: header.getSize() }}
                     className="relative h-10 px-3 text-left align-middle text-xs font-medium text-zinc-500 select-none"
                   >
                     <div
@@ -180,7 +184,6 @@ function DataRow<T>({
       {row.getVisibleCells().map((cell) => (
         <td
           key={cell.id}
-          style={{ width: cell.column.getSize() }}
           className="px-3 py-2 align-middle overflow-hidden"
         >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -199,14 +202,25 @@ function ResizeHandle({
   onTouchStart: (e: React.TouchEvent) => void;
   active: boolean;
 }) {
+  // <div> not <button>: a button captures mousedown for its own click semantics,
+  // and on some browsers that prevents the parent's drag tracking. The handle
+  // is styled with cursor-col-resize so users still know it's draggable.
   return (
-    <button
-      type="button"
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      onClick={(e) => e.stopPropagation()}
+    <div
+      role="separator"
+      aria-orientation="vertical"
       aria-label="Resize column"
-      className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none ${
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onMouseDown(e);
+      }}
+      onTouchStart={(e) => {
+        e.stopPropagation();
+        onTouchStart(e);
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className={`absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none touch-none z-10 ${
         active ? 'bg-blue-500' : 'bg-transparent hover:bg-zinc-300'
       }`}
     />
