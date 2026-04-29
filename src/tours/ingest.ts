@@ -426,6 +426,16 @@ export async function ingestPricing(
   // No usable data and fallback enabled → defer to ingestFromDetail.
   // Detail fallback writes its own snapshot (`-detail.json`) so we don't
   // duplicate the broken pricing snapshot if it exists.
+  // Post-normalize check: trigger fallback when 0 SKUs landed in the DB
+  // even though pricing was reachable. This is broader than the original
+  // raw-row check (which only saw `raw.rows.length === 0`) — it also
+  // catches the normalize-filtered-everything case (e.g. zh-TW DOM that
+  // runPricingRaw captured but the price-parse regex couldn't normalize).
+  // The trade-off: we recover with detail data instead of returning empty,
+  // at the cost of masking normalizer bugs. The silent-write warning in
+  // ingestPricingOnly still fires for skus_written===0, so the smell is
+  // not lost — it's only that the activity row gets populated by detail
+  // rather than left empty.
   const noUsableRows = result.skus_written === 0;
   if (fallbackEnabled && (result.captured_days === 0 || noUsableRows)) {
     // Call through ingestSelf so vi.spyOn(ingest, 'ingestFromDetail') can intercept in tests.
@@ -439,7 +449,7 @@ export async function ingestPricing(
       ? `pricing-threw: ${pricingThrew.message.slice(0, 160)}`
       : result.captured_days === 0
         ? `pricing-empty (days_captured=0)`
-        : `pricing-no-rows (skus_written=0)`;
+        : `pricing-no-skus (captured_days=${result.captured_days}, skus_written=0)`;
     return {
       ...detailResult,
       captured_days: 0,
