@@ -737,6 +737,13 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
     },
 
     rawColumns(table: string): string[] {
+      const ALLOWED = new Set([
+        'activities', 'packages', 'skus', 'sku_observations',
+        'run_sessions', 'execution_logs', 'search_runs', 'coverage_runs',
+      ]);
+      if (!ALLOWED.has(table)) {
+        throw new Error(`rawColumns: unknown table "${table}"`);
+      }
       const stmt = db.prepare(`PRAGMA table_info(${table})`);
       const out: string[] = [];
       while (stmt.step()) out.push((stmt.getAsObject() as any).name);
