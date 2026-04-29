@@ -1,30 +1,50 @@
 ---
-description: Run an opencli klook task — scoped to Klook only (for skill owners testing their platform)
-argument-hint: [activity-id | "keyword" | --poi <name>] [--csv | --ingest]
+description: Run an opencli klook scan/pricing/all task on a POI
+argument-hint: <poi> <scan|pricing|all>   (alias: detail = scan)
 ---
 
-Invoke the `opencli-klook` skill and operate **only on Klook** for this turn. Do not cross into other platforms.
+Invoke the `opencli-klook` skill scoped to klook.
 
-**Argument interpretation** (parse `$ARGUMENTS` in this order):
+**Input contract:** `<poi> <mode>` where mode is one of `scan | pricing | all`.
+The token `detail` is accepted as an alias for `scan`.
 
-1. **`--poi <name>`** → POI mode:
-   - `node dist/cli.js list-pois` — check if the POI is configured
-   - If configured, use its `keywords` to search; if missing, offer to `add-poi` first
+**Step 1 — Parse args:**
+```bash
+node dist/cli.js tours parse-slash-args $ARGUMENTS
+```
 
-2. **Numeric ID** (e.g. `93901`) → single-activity mode:
-   - Ask which sub-command: `get-activity` / `get-packages` / `get-pricing-matrix`
-   - Default to `get-activity`
+Branch on the JSON result:
 
-3. **Quoted keyword phrase** (e.g. `"Mt Fuji day tour"`) → search mode:
-   - `opencli klook search-activities "<phrase>" --limit 5 -f json`
+- `kind: "ok"` → continue with the `poi` and `mode` returned.
+- `kind: "ask"` → present `question` + numbered `choices` to the user and STOP. Do **not** pick a default.
+- `kind: "error"` → print `message` and STOP.
 
-4. **Empty** → print command cheat-sheet from the skill body
+**Step 2 — Pre-flight:** `opencli doctor`.
+Confirm the Browser Bridge cookie locale is `en-US` (per memory `feedback_browser_bridge_en_us`). Adapters are written against en-US DOM and zh-TW silently breaks them.
 
-**Output-format flags**:
-- `--csv` → append `-f csv` to the final opencli call
-- `--ingest` → after scraping, pipe through `tours ingest-pricing klook <id>` + `tours export-csv` for a clean planning-sheet CSV
-- **Default** → pretty-printed JSON
+**Step 3 — Dispatch:**
 
-Verify output against `docs/io-schemas.md` section 3. Klook-specific: has `supplier` field, has `list-trending` command (not supported on other platforms).
+| mode    | command                                                              |
+|---------|----------------------------------------------------------------------|
+| scan    | `node dist/cli.js tours scan --platform klook --poi "<poi>"`         |
+| pricing | `node dist/cli.js tours pricing --platform klook --poi "<poi>"`      |
+| all     | `tours scan ...` then `tours pin --top 5` then `tours pricing ...`   |
+
+**Step 4 — Handle pricing's "no_pinned" branch:**
+
+If `tours pricing` returns `"no_pinned": true` (exit code 2), **do not
+auto-fallback**. Surface the choice to the user verbatim:
+
+```
+No pinned activities for klook × <poi>. Pick:
+  1) /opencli-klook <poi> all
+  2) /opencli-klook <poi> scan         (then pin later)
+  3) tours pin --platform klook --poi <poi> --top 5
+  4) cancel
+```
+
+**klook-specific quirks** (see `opencli-klook` skill for full troubleshooting):
+- Has `supplier` field, has `list-trending` command (not supported on other platforms).
+- Verify output against `docs/io-schemas.md` section 3.
 
 $ARGUMENTS
