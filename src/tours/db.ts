@@ -44,6 +44,13 @@ export interface ToursDB {
   reviewActivity(id: string, status: ReviewStatus, note: string | null): void;
   reviewSKU(id: string, status: ReviewStatus, note: string | null): void;
 
+  /** Returns activities with is_pinned=1, optionally filtered by POI/platform.
+   *  Order: review_count DESC NULLS LAST. */
+  listPinnedActivities(filters?: { poi?: string; platform?: string }): Activity[];
+
+  /** Set the pin state of one activity. Persists immediately. */
+  setPinned(id: string, pinned: boolean): void;
+
   /** Returns column names for the given table (uses PRAGMA table_info). */
   rawColumns(table: string): string[];
 
@@ -504,6 +511,29 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
       }
       const sql = `SELECT ${ACTIVITY_COLS.join(', ')} FROM activities ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_scraped_at DESC`;
       return all<Activity>(sql, params);
+    },
+
+    listPinnedActivities(filters: { poi?: string; platform?: string } = {}) {
+      const wh: string[] = [`is_pinned = 1`];
+      const args: unknown[] = [];
+      if (filters.poi) {
+        wh.push(`LOWER(poi) = LOWER(?)`);
+        args.push(filters.poi);
+      }
+      if (filters.platform) {
+        wh.push(`platform = ?`);
+        args.push(filters.platform);
+      }
+      return all<Activity>(
+        `SELECT ${ACTIVITY_COLS.join(', ')} FROM activities WHERE ${wh.join(' AND ')} ` +
+        `ORDER BY review_count IS NULL, review_count DESC`,
+        args,
+      );
+    },
+
+    setPinned(id: string, pinned: boolean) {
+      db.run(`UPDATE activities SET is_pinned = ? WHERE id = ?`, [pinned ? 1 : 0, id]);
+      persist();
     },
 
     listPackagesForActivity(activityId) {

@@ -31,6 +31,74 @@ describe('is_pinned column', () => {
     expect(acts[0].is_pinned).toBe(0);
   });
 
+  it('listPinnedActivities returns only pinned rows', async () => {
+    const db = await openDB(dbPath);
+    const baseAct = (id: string): any => ({
+      id, platform: 'kkday', platform_product_id: id.split(':')[1],
+      canonical_url: `https://www.kkday.com/en/product/${id.split(':')[1]}`,
+      title: id, supplier: null, poi: 'mt fuji',
+      duration_minutes: null, departure_city: null,
+      rating: null, review_count: 100, order_count: null,
+      description: null, cancellation_policy: null,
+      raw_extras_json: '{}',
+      first_scraped_at: '2026-04-29T00:00:00Z',
+      last_scraped_at: '2026-04-29T00:00:00Z',
+      review_status: 'unverified', review_note: null,
+    });
+    db.upsertActivity(baseAct('kkday:1'));
+    db.upsertActivity(baseAct('kkday:2'));
+    db.upsertActivity(baseAct('kkday:3'));
+    db.setPinned('kkday:1', true);
+    db.setPinned('kkday:2', true);
+
+    const pinned = db.listPinnedActivities({ poi: 'mt fuji', platform: 'kkday' });
+    expect(pinned.map((a) => a.id).sort()).toEqual(['kkday:1', 'kkday:2']);
+  });
+
+  it('setPinned(false) un-pins', async () => {
+    const db = await openDB(dbPath);
+    db.upsertActivity({
+      id: 'kkday:1', platform: 'kkday', platform_product_id: '1',
+      canonical_url: 'https://www.kkday.com/en/product/1',
+      title: 'A', supplier: null, poi: 'mt fuji',
+      duration_minutes: null, departure_city: null,
+      rating: null, review_count: 100, order_count: null,
+      description: null, cancellation_policy: null,
+      raw_extras_json: '{}',
+      first_scraped_at: '2026-04-29T00:00:00Z',
+      last_scraped_at: '2026-04-29T00:00:00Z',
+      review_status: 'unverified', review_note: null,
+    });
+    db.setPinned('kkday:1', true);
+    db.setPinned('kkday:1', false);
+    expect(db.listPinnedActivities()).toEqual([]);
+  });
+
+  it('listPinnedActivities orders by review_count DESC NULLS LAST', async () => {
+    const db = await openDB(dbPath);
+    const mk = (id: string, reviews: number | null): any => ({
+      id, platform: 'kkday', platform_product_id: id.split(':')[1],
+      canonical_url: `https://www.kkday.com/en/product/${id.split(':')[1]}`,
+      title: id, supplier: null, poi: 'mt fuji',
+      duration_minutes: null, departure_city: null,
+      rating: null, review_count: reviews, order_count: null,
+      description: null, cancellation_policy: null,
+      raw_extras_json: '{}',
+      first_scraped_at: '2026-04-29T00:00:00Z',
+      last_scraped_at: '2026-04-29T00:00:00Z',
+      review_status: 'unverified', review_note: null,
+    });
+    db.upsertActivity(mk('kkday:lo', 50));
+    db.upsertActivity(mk('kkday:hi', 1000));
+    db.upsertActivity(mk('kkday:none', null));
+    db.setPinned('kkday:lo', true);
+    db.setPinned('kkday:hi', true);
+    db.setPinned('kkday:none', true);
+
+    const pinned = db.listPinnedActivities();
+    expect(pinned.map((a) => a.id)).toEqual(['kkday:hi', 'kkday:lo', 'kkday:none']);
+  });
+
   it('migration adds the column when opening a DB created without it', async () => {
     // Build a legacy DB (using sql.js directly) that has the activities table
     // but WITHOUT is_pinned — exactly as it existed before the migration was added.
