@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PlatformLogo } from '@/components/dashboard/platform-logo';
 import type { Platform } from '@/lib/data';
 
 const LABEL: Record<Platform | 'all', string> = {
@@ -69,6 +70,7 @@ export function SkusFilters({
           <Pill
             key={p}
             label={LABEL[p]}
+            icon={<PlatformLogo platform={p} size={14} />}
             activeClass={ACTIVE[p]}
             active={selected === p}
             onClick={() => update({ platform: p })}
@@ -101,11 +103,13 @@ function Pill({
   active,
   onClick,
   activeClass,
+  icon,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   activeClass?: string;
+  icon?: React.ReactNode;
 }) {
   const cls = active
     ? (activeClass ?? 'bg-zinc-900 text-white border-zinc-900')
@@ -114,8 +118,9 @@ function Pill({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 h-8 inline-flex items-center rounded-full border text-xs font-medium transition-colors whitespace-nowrap ${cls}`}
+      className={`px-3 h-8 inline-flex items-center gap-1.5 rounded-full border text-xs font-medium transition-colors whitespace-nowrap ${cls}`}
     >
+      {icon}
       {label}
     </button>
   );

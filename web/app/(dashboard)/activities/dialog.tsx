@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlatformBadge } from '@/components/dashboard/platform-badge';
+import { PlatformLinkButton } from '@/components/dashboard/platform-link-button';
 import { fmtDate, fmtDuration, fmtNum, fmtUsd, priceRange } from '@/lib/format';
 import type { ActivityRow, PackageRow, SkuRow } from '@/lib/data';
 import { getPackagesAndSkus } from './actions';
@@ -42,25 +43,36 @@ function DialogBody({ activity }: { activity: ActivityRow }) {
   return (
     <div className="space-y-5">
       <DialogHeader>
-        <div className="flex items-center gap-2 mb-1">
-          <PlatformBadge platform={activity.platform} />
-          <span className="text-xs text-zinc-400 font-mono break-all">
-            id {activity.platform_product_id}
-          </span>
+        <div className="flex items-start justify-between gap-3 pr-8">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <PlatformBadge platform={activity.platform} />
+              <span className="text-xs text-zinc-400 font-mono break-all">
+                id {activity.platform_product_id}
+              </span>
+            </div>
+            <DialogTitle className="text-xl leading-tight">
+              {activity.title ?? '(untitled)'}
+            </DialogTitle>
+            {activity.canonical_url ? (
+              <a
+                href={activity.canonical_url}
+                target="_blank"
+                rel="noopener"
+                className="text-xs text-blue-600 hover:underline break-all block mt-1"
+              >
+                {activity.canonical_url}
+              </a>
+            ) : null}
+          </div>
+          {activity.canonical_url ? (
+            <PlatformLinkButton
+              platform={activity.platform}
+              href={activity.canonical_url}
+              className="shrink-0 mt-0.5"
+            />
+          ) : null}
         </div>
-        <DialogTitle className="text-xl leading-tight pr-6">
-          {activity.title ?? '(untitled)'}
-        </DialogTitle>
-        {activity.canonical_url ? (
-          <a
-            href={activity.canonical_url}
-            target="_blank"
-            rel="noopener"
-            className="text-xs text-blue-600 hover:underline break-all block"
-          >
-            {activity.canonical_url}
-          </a>
-        ) : null}
       </DialogHeader>
 
       {activity.cover_image_url ? (
