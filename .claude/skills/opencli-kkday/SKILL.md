@@ -76,6 +76,7 @@ When `opencli kkday get-pricing-matrix <id>` fails or returns empty:
 - **Calendar shows date but scraper misses it**: KKday occasionally lazy-mounts the calendar after a package "Select" click. The scraper waits, but aggressive changes to their loading animation will break this; symptom is "package found, dates empty".
 - **Booking counter missing**: not every product shows the counter. Missing `bookCount` is normal for newer products, not a scraper failure.
 - **Currency mismatch vs Klook**: KKday defaults to the viewer's currency (via cookie), which may differ from Klook's en-US default. Normalize before cross-platform compare.
+- **Cover image picked logo SVG instead of hero** *(fixed 2026-04-27)*: a generic `img[src*="cdn"]` selector matched the kkday navbar logo (`/logo/...svg`) before the actual product image. `detail.ts` now prioritises `img.pb-image-grid__img` (the product gallery class) and excludes `/_nuxt/`, `/logo/`, and `.svg` paths. If hero images stop populating after a kkday redesign, log the first 5 candidate `<img>` srcs before tightening the filter further. Same pattern applies to airbnb (`/airbnb-platform-assets/` filter).
 
 ## Touchpoints
 
