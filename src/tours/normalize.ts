@@ -193,9 +193,20 @@ function pickExtras(detail: Record<string, unknown> | undefined): Record<string,
     out.first_image = (detail as any).images[0];
   }
   if (Array.isArray((detail as any).sections)) {
-    out.section_titles = (detail as any).sections
+    const rawSections = (detail as any).sections;
+    out.section_titles = rawSections
       .map((s: any) => s.original_title || s.title)
       .filter(Boolean);
+    // Full sections with body content. Capped at 2KB per section to keep
+    // raw_extras_json reasonable; the dashboard uses these for the
+    // "What you'll do", "Things to know", "Cancellation policy" detail
+    // blocks under each activity.
+    out.sections = rawSections
+      .map((s: any) => ({
+        title: s.title || s.original_title || '',
+        content: typeof s.content === 'string' ? s.content.slice(0, 2000) : '',
+      }))
+      .filter((s: any) => s.title && s.content);
   }
   // Store the full option_dimensions list so BD can see every variant axis
   // a platform exposed, even when we haven't yet fanned them into separate

@@ -100,6 +100,22 @@ export function buildDetailEvaluate(): string {
         const hostMatch = bodyText.match(/Hosted by\\s+([^\\n,]{2,80})/i);
         if (hostMatch) supplier = hostMatch[1].trim().slice(0, 120);
       }
+      // Supplier profile URL — airbnb wraps the host card in a link to
+      // /users/profile/<id>?previous_page_name=PdpExperience. Surfaces in
+      // the dashboard so the supplier name is clickable through to the
+      // host's airbnb profile (operator background, other listings, etc.)
+      let supplierUrl = '';
+      const profileAnchor = document.querySelector('a[href*="/users/profile/"]');
+      if (profileAnchor) {
+        const href = profileAnchor.getAttribute('href') || '';
+        try {
+          // Resolve relative href to an absolute URL.
+          const abs = new URL(href, location.origin);
+          supplierUrl = abs.toString();
+        } catch {
+          supplierUrl = href.startsWith('http') ? href : ('https://www.airbnb.com' + href);
+        }
+      }
 
       // City + category: when present, Airbnb renders "<city> · <category>"
       // right above the host card. The actual innerText is split with a stray
@@ -255,6 +271,7 @@ export function buildDetailEvaluate(): string {
         reviewCount,
         bookCount,
         supplier,
+        supplierUrl,
         images,
         itinerary,
         packages,

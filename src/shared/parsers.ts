@@ -143,6 +143,10 @@ export function parseActivityDetail(raw: unknown): KlookDetail {
     tour_type_tag: str(r.tourTypeTag),
     meeting_tag: str(r.meetingTag),
     supplier: str(r.supplier),
+    // Optional clickable link to the supplier's profile page (today only
+    // populated by the airbnb adapter from <a href="/users/profile/...">).
+    // Other adapters can populate this when their host badge has a link.
+    supplier_url: str(r.supplierUrl),
     // Dropdowns / tabs in the booking widget that represent package-variant axes
     option_dimensions: Array.isArray(r.option_dimensions) ? r.option_dimensions : [],
     // Cancellation policy: prefer explicit field from the scraper, otherwise the standardized
