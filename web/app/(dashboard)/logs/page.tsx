@@ -13,12 +13,12 @@ import { Badge } from '@/components/ui/badge';
 import { fmtDateTime } from '@/lib/format';
 import { ExecutionsFilters } from './filters';
 
-export const metadata = { title: 'Executions — CSI' };
+export const metadata = { title: 'Logs — CSI' };
 export const dynamic = 'force-dynamic';
 
 const PLATFORMS: Platform[] = ['klook', 'trip', 'getyourguide', 'kkday', 'airbnb'];
 
-export default async function ExecutionsPage({
+export default async function LogsPage({
   searchParams,
 }: {
   searchParams: Promise<{ platform?: Platform; hours?: string }>;
@@ -45,7 +45,7 @@ export default async function ExecutionsPage({
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-semibold tracking-tight">Executions</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Logs</h1>
         <ExecutionsFilters
           platforms={PLATFORMS}
           defaultPlatform={sp.platform}
@@ -72,7 +72,7 @@ export default async function ExecutionsPage({
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-zinc-200/80 bg-white p-12 text-center text-sm text-zinc-500">
-          No executions match the filter.
+          No logs match the filter.
         </div>
       ) : (
         <div className="rounded-xl border border-zinc-200/80 bg-white overflow-hidden">

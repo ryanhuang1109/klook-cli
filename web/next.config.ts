@@ -16,8 +16,10 @@ const nextConfig: NextConfig = {
       { source: '/activities.html', destination: '/activities', permanent: false },
       { source: '/coverage.html', destination: '/coverage', permanent: false },
       { source: '/runs.html', destination: '/runs', permanent: false },
-      { source: '/executions.html', destination: '/executions', permanent: false },
-      { source: '/cron.html', destination: '/cron', permanent: false },
+      { source: '/executions.html', destination: '/logs', permanent: false },
+      { source: '/executions', destination: '/logs', permanent: false },
+      { source: '/cron.html', destination: '/schedule', permanent: false },
+      { source: '/cron', destination: '/schedule', permanent: false },
       { source: '/archive.html', destination: '/archive', permanent: false },
       { source: '/whitelist.html', destination: '/whitelist', permanent: false },
       // Shortcuts to the latest static report/CSV (files copied into

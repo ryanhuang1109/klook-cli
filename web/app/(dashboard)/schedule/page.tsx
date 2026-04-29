@@ -12,10 +12,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { fmtDateTime, durationBetween } from '@/lib/format';
 
-export const metadata = { title: 'Cron — CSI' };
+export const metadata = { title: 'Schedule — CSI' };
 export const dynamic = 'force-dynamic';
 
-export default async function CronPage() {
+export default async function SchedulePage() {
   const sessions = await listSessions(15);
   const state = readRoutineState();
   const lastRun = sessions[0]?.started_at ?? null;
@@ -25,7 +25,7 @@ export default async function CronPage() {
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Cron / Routine</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Schedule</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

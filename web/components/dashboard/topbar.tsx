@@ -2,26 +2,27 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { isCurrentUserAdmin } from '@/lib/data';
 import { TopbarUser } from './topbar-user';
-import { TopbarNav } from './topbar-nav';
+import { TopbarNav, type NavItem } from './topbar-nav';
 
-const NAV = [
+const PRIMARY_NAV: NavItem[] = [
   { href: '/activities', label: 'Activities' },
   { href: '/packages', label: 'Packages' },
   { href: '/skus', label: 'SKUs' },
   { href: '/coverage', label: 'Coverage' },
   { href: '/runs', label: 'Runs' },
-  { href: '/executions', label: 'Executions' },
-  { href: '/cron', label: 'Cron' },
-  { href: '/archive', label: 'Archive' },
+  { href: '/logs', label: 'Logs' },
+  { href: '/schedule', label: 'Schedule' },
 ];
-
-const ADMIN_NAV = [{ href: '/whitelist', label: 'Whitelist' }];
 
 export async function Topbar() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   const admin = await isCurrentUserAdmin();
-  const links = [...NAV, ...(admin ? ADMIN_NAV : [])];
+  const adminChildren = [
+    { href: '/archive', label: 'Archive' },
+    ...(admin ? [{ href: '/whitelist', label: 'Whitelist' }] : []),
+  ];
+  const links: NavItem[] = [...PRIMARY_NAV, { label: 'Admin', children: adminChildren }];
 
   type Meta = {
     name?: string;

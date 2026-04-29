@@ -209,7 +209,7 @@ function PackagesTab({ activityId }: { activityId: number }) {
   if (data.packages.length === 0) {
     return (
       <p className="text-sm text-zinc-500 italic">
-        No packages — pricing run produced no rows for this activity (check Executions for diagnosis).
+        No packages — pricing run produced no rows for this activity (check Logs for diagnosis).
       </p>
     );
   }
