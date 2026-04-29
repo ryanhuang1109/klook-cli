@@ -599,3 +599,79 @@ export async function cmdVerifySupabaseSync(opts: { format?: string }): Promise<
     db.close();
   }
 }
+
+export async function cmdScan(opts: {
+  platform: string;
+  poi: string;
+  keyword?: string;
+  limit?: number;
+  sortBy?: 'reviews' | 'recommended';
+  screenshot?: boolean;
+}): Promise<void> {
+  loadEnv();
+  if (!VALID_PLATFORMS.includes(opts.platform as Platform)) {
+    throw new Error(`Invalid platform: ${opts.platform}. One of ${VALID_PLATFORMS.join(', ')}`);
+  }
+  const { runScan } = await import('./scan.js');
+  const db = await openDB();
+  const result = await runScan(db, {
+    platform: opts.platform as Platform,
+    poi: opts.poi,
+    keyword: opts.keyword ?? opts.poi,
+    limit: opts.limit,
+    sortBy: opts.sortBy,
+    captureScreenshot: opts.screenshot,
+    onProgress: (m) => process.stderr.write(`-> ${m}\n`),
+  });
+  db.close();
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function cmdPricing(opts: {
+  platform: string;
+  poi?: string;
+  days?: number;
+}): Promise<void> {
+  loadEnv();
+  if (!VALID_PLATFORMS.includes(opts.platform as Platform)) {
+    throw new Error(`Invalid platform: ${opts.platform}. One of ${VALID_PLATFORMS.join(', ')}`);
+  }
+  const { repricePinned } = await import('./pricing.js');
+  const db = await openDB();
+  const result = await repricePinned(db, {
+    platform: opts.platform as Platform,
+    poi: opts.poi,
+    days: opts.days,
+    onProgress: (m) => process.stderr.write(`-> ${m}\n`),
+  });
+  db.close();
+
+  console.log(JSON.stringify(result, null, 2));
+  if (result.no_pinned) {
+    process.stderr.write(
+      `\nNo pinned activities for ${opts.platform}` +
+      (opts.poi ? ` x ${opts.poi}` : '') + `.\n` +
+      `  Run 'tours scan' to discover, then 'tours pin' to mark targets.\n`,
+    );
+    process.exitCode = 2;  // distinct from 0 (ok) and 1 (error) so the slash layer can branch
+  }
+}
+
+export async function cmdPin(opts: {
+  platform: string;
+  poi: string;
+  top: number;
+}): Promise<void> {
+  if (!VALID_PLATFORMS.includes(opts.platform as Platform)) {
+    throw new Error(`Invalid platform: ${opts.platform}. One of ${VALID_PLATFORMS.join(', ')}`);
+  }
+  const { pinTopByReviews } = await import('./pin.js');
+  const db = await openDB();
+  const result = await pinTopByReviews(db, {
+    platform: opts.platform as Platform,
+    poi: opts.poi,
+    top: opts.top,
+  });
+  db.close();
+  console.log(JSON.stringify(result, null, 2));
+}
