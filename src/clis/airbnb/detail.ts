@@ -121,13 +121,27 @@ export function buildDetailEvaluate(): string {
       // Booking counter is not surfaced on Airbnb experience pages — leave blank.
       const bookCount = '';
 
-      // Images: Airbnb serves CDN URLs from a few well-known hosts.
+      // Images: Airbnb hero gallery is on a0.muscache.com under paths
+      // /im/pictures/Mt/MtTemplate-<experience-id>/ (template hosts) or
+      // /im/pictures/miso/Hosting-... (booking-page hero). The same DOM
+      // also embeds search-bar icons and platform asset SVGs that we
+      // do not want — first one wins downstream as first_image, so a
+      // single mis-pick replaces the cover thumbnail with a UI icon.
+      // Reject platform-asset paths and SVGs; the rest of the broad
+      // muscache scan stays so lazy-loaded product photos still land.
       const seenImgs = new Set();
       const images = Array.from(document.querySelectorAll(
         'img[src*="airbnb"], img[src*="muscache"], picture source[srcset*="muscache"]'
       ))
         .map((el) => el.getAttribute('src') || (el.getAttribute('srcset') || '').split(' ')[0])
-        .filter((src) => src && !seenImgs.has(src) && (seenImgs.add(src), true))
+        .filter((src) =>
+          src
+          && !src.includes('/airbnb-platform-assets/')   // search-bar / nav icons
+          && !src.includes('/icons/')                      // generic icon path
+          && !src.toLowerCase().endsWith('.svg')           // SVGs are logos / icons
+          && !seenImgs.has(src)
+          && (seenImgs.add(src), true)
+        )
         .slice(0, 10);
 
       // ── Sections: scrape h2/h3 ──
