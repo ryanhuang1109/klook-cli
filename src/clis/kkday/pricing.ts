@@ -32,7 +32,12 @@ function buildTargetDates(days: number): { iso: string; year: number; month: num
   return out;
 }
 
-/** JS to enumerate option-item elements with their titles and ids. */
+/** JS to enumerate `.option-item` packages on the **old** KKday product UI.
+ *
+ * KKday ships two coexisting product-page UIs: the old `.option-item` flat
+ * list (e.g. SHIBUYA SKY 133300) and the new `#option-sec` chip-filter
+ * (e.g. DMZ 271271). When this returns [], the caller falls back to
+ * `LIST_OPTIONS_NEW_UI_JS` for a best-effort capture. */
 const LIST_OPTIONS_JS = `
   (() => {
     const str = (v) => v == null ? '' : String(v).trim().replace(/\\s+/g, ' ');
@@ -74,6 +79,70 @@ const LIST_OPTIONS_JS = `
         original_price_raw: str(originEl?.textContent),
       };
     });
+  })()
+`;
+
+/** New-UI fallback: enumerate packages from `#option-sec` chip layout.
+ *
+ * The new UI doesn't expose a calendar grid we can walk; only the currently-
+ * selected (or first visible) SKU shows its price. We surface whatever is
+ * visible as one row per package; the caller treats every target date as
+ * carrying that same base price (better than 0). */
+const LIST_OPTIONS_NEW_UI_JS = `
+  (() => {
+    const str = (v) => v == null ? '' : String(v).trim().replace(/\\s+/g, ' ');
+    const PRICE_RE = /([\\d,]+(?:\\.\\d+)?)/;
+    const root = document.getElementById('option-sec');
+    if (!root) return [];
+
+    // Package cards in new UI: each tour-package-section-list-item or
+    // sku-amount-option-item-layout represents one bookable package.
+    let items = Array.from(root.querySelectorAll(
+      '[class*="tour-package-section-list-item"], [class*="ProductPackage"], [class*="package-card"], .sku-amount-option-item-layout'
+    ));
+    // De-dup by best textual signature
+    const seen = new Set();
+    items = items.filter((el) => {
+      const key = str(el.textContent).slice(0, 80);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const out = [];
+    if (items.length === 0) {
+      // Nothing iterable — fall back to a single visible price + chip names.
+      const priceEl = root.querySelector('[class*="kk-price-base--md"], [class*="price-base"]');
+      const priceTxt = str(priceEl?.textContent);
+      const m = priceTxt.match(PRICE_RE);
+      const titleEl = document.querySelector('h1');
+      out.push({
+        id: 'newui-default',
+        title: str(titleEl?.textContent).slice(0, 200) || 'Default package',
+        description: '',
+        group_title: 'Package',
+        price_from: m ? m[1].replace(/,/g, '') : '',
+        currency_symbol: 'US$',
+        original_price_raw: '',
+      });
+    } else {
+      items.forEach((item, i) => {
+        const nameEl = item.querySelector('.sku-amount-option-item-layout__name, h4, h3, [class*="package-name"], [class*="name"]');
+        const priceEl = item.querySelector('[class*="kk-price-base--md"], [class*="price-base"], [class*="price"]');
+        const priceTxt = str(priceEl?.textContent);
+        const m = priceTxt.match(PRICE_RE);
+        out.push({
+          id: 'newui-' + i,
+          title: str(nameEl?.textContent).slice(0, 200) || ('Package ' + (i + 1)),
+          description: '',
+          group_title: 'Package',
+          price_from: m ? m[1].replace(/,/g, '') : '',
+          currency_symbol: 'US$',
+          original_price_raw: '',
+        });
+      });
+    }
+    return out;
   })()
 `;
 
@@ -217,10 +286,57 @@ cli({
       }))()
     `) as any;
 
-    // Enumerate options (packages)
-    const options = await page.evaluate(LIST_OPTIONS_JS) as any[];
+    // Enumerate options (packages). Try the old UI first; if empty, fall
+    // back to the new chip-filter UI for a best-effort capture.
+    let options = await page.evaluate(LIST_OPTIONS_JS) as any[];
+    let usingNewUI = false;
     if (!Array.isArray(options) || options.length === 0) {
-      throw new Error('No option-item elements found on KKday page. Page structure may have changed.');
+      const newUiOptions = await page.evaluate(LIST_OPTIONS_NEW_UI_JS) as any[];
+      if (Array.isArray(newUiOptions) && newUiOptions.length > 0) {
+        options = newUiOptions;
+        usingNewUI = true;
+      } else {
+        throw new Error('No option-item elements found on KKday page. Page structure may have changed.');
+      }
+    }
+
+    // New UI shortcut: there's no per-date calendar to walk — the visible
+    // base price is the only signal. Replicate it across requested dates.
+    if (usingNewUI) {
+      const checkTimestamp = new Date().toISOString();
+      const newUiRows: any[] = [];
+      for (const opt of options) {
+        for (const t of buildTargetDates(days)) {
+          newUiRows.push({
+            ota: 'kkday',
+            activity_id: productId,
+            activity_title: meta?.title || '',
+            activity_url: meta?.url || url,
+            date: t.iso,
+            check_date_time_gmt8: checkTimestamp,
+            group_title: opt.group_title || 'Package',
+            package_name: opt.title,
+            package_id: String(opt.id).replace(/^optionItem/, ''),
+            daily_min_price: opt.price_from || '',
+            daily_min_price_raw: opt.price_from || '',
+            package_base_price: opt.price_from || '',
+            currency: (meta?.currencyHint || 'US$').replace('$', '').trim() || 'US',
+            original_price: opt.original_price_raw || '',
+            availability: 'Available',
+          });
+        }
+      }
+      return {
+        activity_id: productId,
+        ota: 'kkday',
+        url: meta?.url || url,
+        title: meta?.title || '',
+        days_requested: days,
+        days_captured_per_package: days,
+        packages_found: options.length,
+        _note: 'new-ui-fallback: chip-filter UX; per-date variation not captured. price = visible base price.',
+        rows: newUiRows,
+      };
     }
 
     const targets = buildTargetDates(days);

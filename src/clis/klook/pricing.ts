@@ -35,10 +35,16 @@ function buildTargetDates(days: number): { iso: string; year: number; month: num
   return out;
 }
 
-/** JS to open calendar popup. */
+/** JS to open calendar popup.
+ *
+ * `#desktop-package-date-picker` is itself the <button> — earlier code searched
+ * for a button child, which silently returned null and propagated to the
+ * calendar-nav step as "no-nav-btn". */
 const OPEN_CALENDAR_JS = `
   (() => {
-    const btn = document.querySelector('#desktop-package-date-picker button, .all-date-box button');
+    const btn = document.querySelector(
+      '#desktop-package-date-picker, .activity-package-date-button-picker, .all-date-box button, .activity-package-date.js-spm-package-date-picker button'
+    );
     if (btn) { btn.click(); return true; }
     return false;
   })()
@@ -103,12 +109,22 @@ function buildClickDayJs(day: number): string {
   `;
 }
 
-/** JS to scrape currently-visible package cards and their prices. */
+/** JS to scrape currently-visible package cards and their prices.
+ *
+ * Klook ships two coexisting package-picker UIs and routes activities to
+ * either at random:
+ *   - Old: `#package_options_group .card[id*="group-web-id"]` — a flat list
+ *     of cards with prices visible per card. Preferred when present.
+ *   - New: `#package_option` / `.activity-package-options` — a chip-filter
+ *     UI showing only the currently-selected package's price in the right
+ *     rail. Treated as a fallback. */
 const SCRAPE_PACKAGES_JS = `
   (() => {
     const str = (v) => v == null ? '' : String(v).trim().replace(/\\s+/g, ' ');
+    const PRICE_RE = /((?:HK|US|TWD|JPY|SGD|KRW|EUR|CNY|CHF|GBP|AUD)\\$?)\\s*([\\d,]+(?:\\.\\d+)?)/;
     const out = [];
 
+    // ── Old UI: flat .card list ──
     // Each .card is a package (SKU). They sit under group containers whose
     // data-spm-module encodes GroupTitle.
     const cards = Array.from(document.querySelectorAll('#package_options_group .card[id*="group-web-id"]'));
@@ -173,6 +189,73 @@ const SCRAPE_PACKAGES_JS = `
         price_raw: priceText,
         availability,
       });
+    }
+
+    // ── New UI fallback: chip-filter picker ──
+    // Only fires when the old card list is empty. Reads the currently-
+    // selected package's price from the right-rail / banner. Records one
+    // synthetic row per visible package-type chip so we capture at least the
+    // base-price dimension of the matrix; the price is the same across rows
+    // (Klook's new UI doesn't reveal per-chip prices without a click).
+    if (out.length === 0) {
+      const newRoot = document.querySelector('#package_option, .activity-package-options');
+      if (newRoot) {
+        const priceEl =
+          document.querySelector('.desktop-new-right-price [class*="price-base"], .page-banner-right-price [class*="price-base"], .price-box.salling-price') ||
+          newRoot.querySelector('[class*="price-base"], [class*="salling-price"], [class*="price"]');
+        const priceText = str(priceEl?.textContent);
+        const m = priceText.match(PRICE_RE);
+        if (m) {
+          const currency = m[1].replace('$', '').trim();
+          const price = m[2].replace(/,/g, '');
+
+          // Chip-style package list lives under .package-options-attr-desktop
+          // or similar. Each chip is a clickable child with the package label.
+          const attrRoot =
+            newRoot.querySelector('.package-options-attr-desktop, .package-options-content[class*="detail-type"]') || newRoot;
+          const chipEls = Array.from(
+            attrRoot.querySelectorAll('[class*="kk-chip"], [class*="package-attr-item"], [class*="spec-item"], [class*="option-card"], button, [role="button"]')
+          ).filter((el) => {
+            const t = str(el.textContent);
+            return t && t.length > 2 && t.length < 200 && !/^(check availability|select|clear all|please|reset)$/i.test(t);
+          });
+          // Dedupe by chip text — Klook duplicates chip nodes for desktop/mobile.
+          const seen = new Set();
+          const chips = [];
+          for (const el of chipEls) {
+            const label = str(el.textContent);
+            if (!seen.has(label)) { seen.add(label); chips.push(label); }
+          }
+
+          if (chips.length === 0) {
+            // No chips visible — synthesize one entry from the page title.
+            const title = str(document.querySelector('h1')?.textContent).slice(0, 200);
+            out.push({
+              package_id: 'newui-default',
+              group_title: 'Package',
+              package_name: title || 'Default package',
+              price,
+              currency,
+              original_price: '',
+              price_raw: priceText,
+              availability: 'Available',
+            });
+          } else {
+            for (let i = 0; i < chips.length; i++) {
+              out.push({
+                package_id: 'newui-' + i,
+                group_title: 'Package',
+                package_name: chips[i].slice(0, 200),
+                price,
+                currency,
+                original_price: '',
+                price_raw: priceText,
+                availability: 'Available',
+              });
+            }
+          }
+        }
+      }
     }
 
     return out;
