@@ -1,22 +1,14 @@
 import { listSessions, listCoverageRuns, listSearchRuns } from '@/lib/data';
 import { KpiCard } from '@/components/dashboard/kpi-card';
-import { PlatformBadge } from '@/components/dashboard/platform-badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { fmtDateTime, fmtNum } from '@/lib/format';
 import { SessionDeepdive } from './session-deepdive';
+import { CoverageRunsTable } from './coverage-runs-table';
+import { SearchRunsTable } from './search-runs-table';
 
 export const metadata = { title: 'Runs — CSI' };
 export const dynamic = 'force-dynamic';
@@ -55,83 +47,11 @@ export default async function RunsPage() {
         </TabsContent>
 
         <TabsContent value="coverage">
-          {coverageRuns.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="rounded-xl border border-zinc-200/80 bg-white overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50">
-                    <TableHead className="w-[180px]">Run at</TableHead>
-                    <TableHead>POI</TableHead>
-                    <TableHead>Platform</TableHead>
-                    <TableHead>Filter</TableHead>
-                    <TableHead className="text-right">Fetched</TableHead>
-                    <TableHead className="text-right">New unique</TableHead>
-                    <TableHead className="text-right">Total reported</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {coverageRuns.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs font-mono text-zinc-500">
-                        {fmtDateTime(r.run_at)}
-                      </TableCell>
-                      <TableCell>{r.poi}</TableCell>
-                      <TableCell><PlatformBadge platform={r.platform} /></TableCell>
-                      <TableCell className="text-xs font-mono text-zinc-500 truncate max-w-[16rem]" title={r.filter_signature}>
-                        {r.filter_signature}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtNum(r.fetched)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{fmtNum(r.new_unique)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-zinc-600">{fmtNum(r.total_reported)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <CoverageRunsTable rows={coverageRuns} />
         </TabsContent>
 
         <TabsContent value="search">
-          {searchRuns.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="rounded-xl border border-zinc-200/80 bg-white overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50">
-                    <TableHead className="w-[180px]">Run at</TableHead>
-                    <TableHead>Platform</TableHead>
-                    <TableHead>Keyword</TableHead>
-                    <TableHead>POI</TableHead>
-                    <TableHead className="text-right">Found</TableHead>
-                    <TableHead className="text-right">Ingested</TableHead>
-                    <TableHead className="text-right">OK / Fail</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {searchRuns.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs font-mono text-zinc-500">
-                        {fmtDateTime(r.run_at)}
-                      </TableCell>
-                      <TableCell><PlatformBadge platform={r.platform} /></TableCell>
-                      <TableCell>{r.keyword}</TableCell>
-                      <TableCell className="text-zinc-700">{r.poi ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtNum(r.found)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{fmtNum(r.ingested)}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">
-                        <span className="text-emerald-700">{r.succeeded ?? 0}</span>
-                        {' / '}
-                        <span className="text-rose-700">{r.failed ?? 0}</span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <SearchRunsTable rows={searchRuns} />
         </TabsContent>
       </Tabs>
     </div>
