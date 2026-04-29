@@ -287,6 +287,7 @@ export function normalizePricingRun(
     last_scraped_at: now,
     review_status: 'unverified',
     review_note: null,
+    is_pinned: 0,
   };
 
   const packages = new Map<string, Package>();

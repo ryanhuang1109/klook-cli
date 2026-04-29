@@ -53,7 +53,7 @@ export const ActivitySchema = z.object({
   review_status: ReviewStatusEnum.default('unverified'),
   review_note: z.string().nullable().default(null),
   /** 1 = pinned (always ingest pricing); 0 = catalog-only. Set via setPinned, never overwritten by upsert. */
-  is_pinned: z.number().int().optional(),
+  is_pinned: z.number().int().default(0),
 });
 export type Activity = z.infer<typeof ActivitySchema>;
 
