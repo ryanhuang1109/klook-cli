@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { isCurrentUserAdmin } from '@/lib/data';
@@ -35,10 +36,15 @@ export async function Topbar() {
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200/70 bg-white/80 backdrop-blur-md">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center gap-5">
-        <Link href="/" className="flex items-center shrink-0">
-          <span className="font-sans italic text-base font-bold tracking-tight bg-zinc-900 text-white px-2.5 py-0.5 rounded">
-            CSI
-          </span>
+        <Link href="/" className="flex items-center shrink-0" aria-label="Competitor Supply Intelligence">
+          <Image
+            src="/csi-logo.png"
+            alt="CSI"
+            width={276}
+            height={160}
+            priority
+            className="h-9 w-auto"
+          />
         </Link>
 
         <TopbarNav links={links} />
