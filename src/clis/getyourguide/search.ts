@@ -58,7 +58,7 @@ cli({
   browser: true,
   args: [
     { name: 'query', required: true, positional: true, help: 'Search keyword (e.g. "Universal Studios Japan")' },
-    { name: 'limit', type: 'int', default: 20, help: 'Max results (1-50)' },
+    { name: 'limit', type: 'int', default: 20, help: 'Max results (1-200)' },
   ],
   columns: ['rank', 'title', 'price', 'rating', 'review_count', 'url'],
   func: async (page: IPage, kwargs) => {
@@ -69,7 +69,31 @@ cli({
     const url = `https://www.getyourguide.com/s/?q=${encodeURIComponent(query)}`;
 
     await page.goto(url);
-    await page.autoScroll({ times: 3, delayMs: 1500 });
+
+    // GetYourGuide lazy-loads activities on scroll. Same loop pattern as
+    // trip/search: scroll in batches, count distinct activity anchors
+    // (URL pattern `/-tNNN/`), stop on limit or two stable rounds.
+    const COUNT_JS = `(() => {
+      const seen = new Set();
+      for (const a of document.querySelectorAll('a[href*="-t"]')) {
+        const h = a.getAttribute('href') || '';
+        if (/-t\\d+/.test(h)) seen.add(h);
+      }
+      return seen.size;
+    })()`;
+    let lastCount = 0;
+    let stableRounds = 0;
+    for (let round = 0; round < 12; round++) {
+      await page.autoScroll({ times: 3, delayMs: 1500 });
+      const count = Number(await page.evaluate(COUNT_JS)) || 0;
+      if (count >= limit) break;
+      if (count === lastCount) {
+        if (++stableRounds >= 2) break;
+      } else {
+        stableRounds = 0;
+        lastCount = count;
+      }
+    }
 
     const raw = await page.evaluate(buildSearchEvaluate(limit));
     const items = Array.isArray(raw?.items) ? raw.items : [];
