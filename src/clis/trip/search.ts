@@ -54,7 +54,7 @@ cli({
   browser: true,
   args: [
     { name: 'query', required: true, positional: true, help: 'Search keyword (e.g. "Tokyo", "Mt Fuji tour")' },
-    { name: 'limit', type: 'int', default: 20, help: 'Max results (1-50)' },
+    { name: 'limit', type: 'int', default: 20, help: 'Max results (1-200)' },
   ],
   columns: ['rank', 'title', 'price', 'rating', 'review_count', 'url'],
   func: async (page: IPage, kwargs) => {
@@ -65,7 +65,26 @@ cli({
     const url = `https://www.trip.com/things-to-do/list?keyword=${encodeURIComponent(query)}&locale=en-XX`;
 
     await page.goto(url);
-    await page.autoScroll({ times: 3, delayMs: 1500 });
+
+    // Trip.com lazy-loads search results on scroll. autoScroll's fixed
+    // 'times' parameter caps us prematurely — instead scroll in batches
+    // and re-count distinct detail-link anchors until either the limit
+    // is reached or two consecutive rounds add no new items (page
+    // exhausted). Hard maxRounds=12 caps wall time on stuck sessions.
+    const COUNT_JS = `(() => document.querySelectorAll('a[href*="/things-to-do/detail/"]').length)()`;
+    let lastCount = 0;
+    let stableRounds = 0;
+    for (let round = 0; round < 12; round++) {
+      await page.autoScroll({ times: 3, delayMs: 1500 });
+      const count = Number(await page.evaluate(COUNT_JS)) || 0;
+      if (count >= limit) break;
+      if (count === lastCount) {
+        if (++stableRounds >= 2) break;
+      } else {
+        stableRounds = 0;
+        lastCount = count;
+      }
+    }
 
     const raw = await page.evaluate(buildSearchEvaluate(limit));
     const items = Array.isArray(raw?.items) ? raw.items : [];

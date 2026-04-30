@@ -63,10 +63,11 @@ export async function runScan(db: ToursDB, opts: ScanOptions): Promise<ScanResul
       `${opts.platform}/${activityId} (${ingest.parseReviewCount(hit.review_count).toLocaleString()} reviews) — ${(hit.title ?? '').slice(0, 60)}`,
     );
     // Transient browser-bridge failures (e.g. "navigated or closed",
-    // "Target closed") are retried once after a 4s delay, mirroring the
-    // same pattern used by ingestBySearch. Anything non-transient or that
-    // fails on the second attempt is recorded in `failed` immediately.
-    const TRANSIENT_RE = /navigated or closed|target closed|session closed|ERR_NETWORK|Execution context was destroyed/i;
+    // "Target closed") AND spawn-level timeouts (when opencli's child
+    // process hits its 180s ceiling on a slow detail page) are retried
+    // once after a 4s delay, mirroring ingestBySearch. Anything else, or a
+    // failure on the second attempt, is recorded in `failed` immediately.
+    const TRANSIENT_RE = /navigated or closed|target closed|session closed|ERR_NETWORK|Execution context was destroyed|ETIMEDOUT|spawnSync .* timed? ?out/i;
     const maxAttempts = 2;
     let lastErr: string | null = null;
     let done = false;

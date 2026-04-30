@@ -3,10 +3,11 @@ import { __test__ } from '../../src/clis/klook/search.js';
 
 describe('klook/search', () => {
   describe('clampLimit', () => {
-    it('clamps to range [1, 50]', () => {
+    it('clamps to range [1, 200] (was 50 before scroll-pagination)', () => {
       expect(__test__.clampLimit(0)).toBe(1);
       expect(__test__.clampLimit(25)).toBe(25);
-      expect(__test__.clampLimit(100)).toBe(50);
+      expect(__test__.clampLimit(100)).toBe(100);
+      expect(__test__.clampLimit(500)).toBe(200);
       expect(__test__.clampLimit(NaN)).toBe(20);
     });
   });

@@ -7,10 +7,19 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { parseSearchResults } from '../../shared/parsers.js';
 
+/**
+ * Cap callers can ask for. 200 mirrors the over-fetch ceiling used by
+ * `runScan` (src/tours/ingest.ts:SEARCH_COUNT_CAP). Adapters pass this
+ * through to whatever the underlying source allows — for the public-API
+ * platforms the source itself imposes its own ceiling, for the
+ * browser-bridge platforms we drive scroll-load until count plateaus.
+ */
+export const SEARCH_HARD_CAP = 200;
+
 export function clampLimit(raw: unknown, fallback = 20): number {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(1, Math.min(Math.floor(parsed), 50));
+  return Math.max(1, Math.min(Math.floor(parsed), SEARCH_HARD_CAP));
 }
 
 /** Map Klook API sort values to our CLI sort options */

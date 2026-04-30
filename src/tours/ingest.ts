@@ -132,9 +132,11 @@ export async function ingestBySearch(
 
     // Transient browser-bridge failures — mostly seen on Trip.com where the
     // detail page re-renders mid-scrape — surface as "navigated or closed"
-    // / "Target closed" / "Session closed". Retry once with a 4s delay to
-    // let the bridge settle. Anything else fails immediately.
-    const TRANSIENT_RE = /navigated or closed|target closed|session closed|ERR_NETWORK|Execution context was destroyed/i;
+    // / "Target closed" / "Session closed". Spawn-level timeouts
+    // (`spawnSync opencli ETIMEDOUT`) on slow detail pages are also
+    // retryable. Retry once with a 4s delay to let the bridge settle.
+    // Anything else fails immediately.
+    const TRANSIENT_RE = /navigated or closed|target closed|session closed|ERR_NETWORK|Execution context was destroyed|ETIMEDOUT|spawnSync .* timed? ?out/i;
     const maxAttempts = 2;
     let lastErr: string | null = null;
     let done = false;
