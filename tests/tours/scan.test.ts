@@ -109,7 +109,7 @@ describe('runScan', () => {
       throw new Error('Activity not found in DB');
     });
 
-    const fakeDb: any = { logSearchRun: vi.fn() };
+    const fakeDb: any = { logSearchRun: vi.fn(), logExecution: vi.fn() };
     const r = await runScan(fakeDb, {
       platform: 'kkday', poi: 'mt fuji', keyword: 'mt fuji', limit: 1,
     });
@@ -117,6 +117,30 @@ describe('runScan', () => {
     expect(attempts).toBe(1);   // exactly one attempt
     expect(r.succeeded).toBe(0);
     expect(r.failed).toHaveLength(1);
+  });
+
+  it('writes execution_logs row on terminal failure', async () => {
+    vi.spyOn(ingest, 'runSearch').mockReturnValue([
+      { title: 'A', url: 'https://www.kkday.com/en/product/1', review_count: '10' },
+    ] as any);
+    vi.spyOn(ingest, 'ingestFromDetail').mockImplementation(async () => {
+      throw new Error('Activity not found');
+    });
+
+    const logExecution = vi.fn();
+    const fakeDb: any = { logSearchRun: vi.fn(), logExecution };
+
+    await runScan(fakeDb, {
+      platform: 'kkday', poi: 'mt fuji', keyword: 'mt fuji', limit: 1,
+    });
+
+    expect(logExecution).toHaveBeenCalledOnce();
+    const row = logExecution.mock.calls[0][0];
+    expect(row.platform).toBe('kkday');
+    expect(row.activity_id).toBe('1');
+    expect(row.strategy).toBe('opencli-detail');
+    expect(row.succeeded).toBe(0);
+    expect(row.error_message).toMatch(/Activity not found/);
   });
 
   it('writes a search_runs log row', async () => {

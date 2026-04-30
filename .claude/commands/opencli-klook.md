@@ -19,8 +19,7 @@ Branch on the JSON result:
 - `kind: "ask"` → present `question` + numbered `choices` to the user and STOP. Do **not** pick a default.
 - `kind: "error"` → print `message` and STOP.
 
-**Step 2 — Pre-flight:** `opencli doctor`.
-Confirm the Browser Bridge cookie locale is `en-US` (per memory `feedback_browser_bridge_en_us`). Adapters are written against en-US DOM and zh-TW silently breaks them.
+**Step 2 — Pre-flight:** Klook search uses a public API (no Browser Bridge needed). Skip locale checks; just confirm the dev environment can reach klook.com.
 
 **Step 3 — Dispatch:**
 

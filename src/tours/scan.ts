@@ -6,7 +6,7 @@
  */
 import type { ToursDB } from './db.js';
 import type { Platform } from './types.js';
-import { runSearch, ingestFromDetail, parseReviewCount } from './ingest.js';
+import * as ingest from './ingest.js';
 
 export interface ScanOptions {
   platform: Platform;
@@ -29,16 +29,13 @@ export interface ScanResult {
 export async function runScan(db: ToursDB, opts: ScanOptions): Promise<ScanResult> {
   const limit = opts.limit ?? 30;
   const sortBy = opts.sortBy ?? 'reviews';
-  // 200 is a pragmatic cap covering 99% of POIs without blowing memory on
-  // the browser-bridge platforms. Same value used by ingestBySearch.
-  const COUNT_CAP = 200;
 
-  const rawHits = runSearch(opts.platform, opts.keyword, COUNT_CAP);
+  const rawHits = ingest.runSearch(opts.platform, opts.keyword, ingest.SEARCH_COUNT_CAP);
   const totalFound = rawHits.length;
 
   const ranked = sortBy === 'reviews'
     ? [...rawHits].sort(
-        (a, b) => parseReviewCount(b.review_count) - parseReviewCount(a.review_count),
+        (a, b) => ingest.parseReviewCount(b.review_count) - ingest.parseReviewCount(a.review_count),
       )
     : rawHits;
   const hits = ranked.slice(0, limit);
@@ -63,7 +60,7 @@ export async function runScan(db: ToursDB, opts: ScanOptions): Promise<ScanResul
     }
     const activityId = idMatch[1];
     opts.onProgress?.(
-      `${opts.platform}/${activityId} (${parseReviewCount(hit.review_count).toLocaleString()} reviews) — ${(hit.title ?? '').slice(0, 60)}`,
+      `${opts.platform}/${activityId} (${ingest.parseReviewCount(hit.review_count).toLocaleString()} reviews) — ${(hit.title ?? '').slice(0, 60)}`,
     );
     // Transient browser-bridge failures (e.g. "navigated or closed",
     // "Target closed") are retried once after a 4s delay, mirroring the
@@ -76,7 +73,7 @@ export async function runScan(db: ToursDB, opts: ScanOptions): Promise<ScanResul
 
     for (let attempt = 1; attempt <= maxAttempts && !done; attempt++) {
       try {
-        await ingestFromDetail(db, {
+        await ingest.ingestFromDetail(db, {
           platform: opts.platform,
           activityId,
           poi: opts.poi,
@@ -95,6 +92,19 @@ export async function runScan(db: ToursDB, opts: ScanOptions): Promise<ScanResul
           await new Promise((r) => setTimeout(r, 4000));
           continue;
         }
+        // Either non-transient or out of retries — log and record failure.
+        db.logExecution({
+          session_id: opts.sessionId ?? null,
+          platform: opts.platform,
+          activity_id: activityId,
+          strategy: 'opencli-detail',
+          duration_ms: 0,
+          succeeded: 0,
+          error_message: lastErr,
+          packages_written: 0,
+          skus_written: 0,
+          fallback_reason: null,
+        });
         failed.push({ url, reason: lastErr });
         done = true;
       }

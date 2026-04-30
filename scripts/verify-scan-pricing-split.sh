@@ -9,7 +9,7 @@ POI="${POI:-mt fuji}"
 PLATFORM="${PLATFORM:-kkday}"
 JQ_BIN="${JQ_BIN:-jq}"
 LIMIT="${LIMIT:-5}"
-TOP="${TOP:-2}"
+TOP="${TOP:-5}"
 
 # Run from repo root (this script may be invoked from anywhere).
 cd "$(dirname "$0")/.."

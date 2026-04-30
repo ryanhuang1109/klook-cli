@@ -18,6 +18,14 @@ import { urlForLanguage, applyDefaultLanguage } from './url-locale.js';
 // can intercept intra-module calls in vitest's ESM environment.
 import * as ingestSelf from './ingest.js';
 
+/**
+ * Pragmatic ceiling for `runSearch` over-fetch. Covers ~99% of POIs
+ * without blowing memory on browser-bridge platforms (each result
+ * carries DOM-extracted fields). Used by both `runScan` (catalog) and
+ * legacy `ingestBySearch` (coupled flow).
+ */
+export const SEARCH_COUNT_CAP = 200;
+
 function stripOpencliNoise(output: string): string {
   return output
     .split('\n')
@@ -86,10 +94,7 @@ export async function ingestBySearch(
   // Probe the search with a HIGH cap so `total_found` reflects the real
   // population the platform returns for this keyword — not the ingest limit.
   // The same fetched list feeds the re-rank + slice, so this is one call.
-  // 200 is a pragmatic ceiling that covers 99% of POIs without blowing out
-  // memory on the browser-bridge platforms.
-  const COUNT_CAP = 200;
-  const rawHits = runSearch(opts.platform, opts.keyword, COUNT_CAP);
+  const rawHits = runSearch(opts.platform, opts.keyword, SEARCH_COUNT_CAP);
   const totalFound = rawHits.length;
 
   let ranked: SearchHit[];
