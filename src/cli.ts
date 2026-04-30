@@ -606,6 +606,40 @@ toursCmd
     }
   });
 
+const routineCmd = toursCmd
+  .command('routine')
+  .description('Routine config management (Supabase-backed). Used by daily-routine.sh.');
+
+routineCmd
+  .command('fetch-config')
+  .description('Pull the singleton routine_config row from Supabase into data/routine-config.json. Falls back to the existing local file when Supabase is unreachable (unless --strict).')
+  .option('--out <path>', 'Output path (default: data/routine-config.json)')
+  .option('--strict', 'Disable local fallback — exit non-zero if Supabase fetch fails', false)
+  .action(async (opts: { out?: string; strict?: boolean }) => {
+    const { cmdRoutineFetchConfig } = await import('./tours/commands.js');
+    try {
+      await cmdRoutineFetchConfig({ out: opts.out, allowFallback: !opts.strict });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+routineCmd
+  .command('push-config')
+  .description('Push data/routine-config.json up to the Supabase routine_config singleton row.')
+  .option('--in <path>', 'Input path (default: data/routine-config.json)')
+  .option('--updated-by <label>', 'Free-text audit label (default: cli:push)')
+  .action(async (opts: { in?: string; updatedBy?: string }) => {
+    const { cmdRoutinePushConfig } = await import('./tours/commands.js');
+    try {
+      await cmdRoutinePushConfig(opts);
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 toursCmd
   .command('verify-supabase-sync')
   .description('Compare row counts between local SQLite and Supabase')
