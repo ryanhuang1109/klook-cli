@@ -50,7 +50,7 @@ Concretely, the bar to exit Phase 1 is roughly:
        ┌─────────────────────────────────────────────────┐
        │  Claude Code skills (orchestration only)         │
        │  opencli-router, opencli-<platform>,             │
-       │  opencli-tours-routine, opencli-compare-poi      │
+       │  opencli-routine, opencli-compare-poi            │
        └────────────────────┬────────────────────────────┘
                             │ invokes (deterministic)
                             ▼
@@ -110,7 +110,7 @@ flowchart LR
 1. **Direct shell** — `opencli klook search "Mt Fuji"` (fastest, no agent involved)
 2. **Tours pipeline shell** — `node dist/cli.js tours run-daily-routine ...` (full ingest → export → report chain)
 3. **Conversational ask in Claude Code** — Claude reads the relevant skill, invokes the right CLI command, interprets output. Skills supply *how to invoke*, not *how to scrape*.
-4. **Scheduled routines via Claude Code** — Ryan's cron runtime; same as #3 but unattended. Routine config picks the slash command (e.g. `/standup`, `/opencli-tours-routine`) which itself runs the CLI.
+4. **Scheduled routines via Claude Code** — Ryan's cron runtime; same as #3 but unattended. Routine config picks the slash command (e.g. `/standup`, `/opencli-routine`) which itself runs the CLI.
 5. **GitHub auto-deploy** — push to `main` → Vercel rebuilds the web dashboard from `data/golden/latest.csv`. Never `vercel --prod` manually.
 
 ---
@@ -438,7 +438,7 @@ Skills only matter at three points:
 **Skills inventory** (under `.claude/skills/`):
 - `opencli-router` — dispatcher
 - `opencli-{klook,trip,getyourguide,kkday,airbnb}` — per-platform reference (Phase 1)
-- `opencli-tours-routine` — daily ingest playbook (Phase 1, **the Enrichment driver**)
+- `opencli-routine` — daily pipeline orchestrator: delegates to `opencli-scan` / `opencli-pricing` per (POI, platform) target
 - `opencli-compare-poi` — Phase 2, deferred — don't invoke in routines yet
 
 ---

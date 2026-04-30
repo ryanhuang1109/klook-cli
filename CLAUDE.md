@@ -14,7 +14,7 @@ Platform-specific and cross-platform playbooks live as skills under `.claude/ski
 | `opencli-getyourguide` | GetYourGuide commands + quirks | TODO |
 | `opencli-kkday` | KKday commands + quirks | TODO |
 | `opencli-airbnb` | Airbnb Experiences commands + quirks | klook-cli core team |
-| `opencli-tours-routine` | Daily tours ingest → export → report playbook | shared |
+| `opencli-routine` | Orchestrator that delegates to opencli-scan / opencli-pricing per (POI, platform) target | shared |
 | `opencli-compare-poi` | Cross-platform POI compare workflow | shared |
 
 When a user mentions a specific platform or workflow, invoke the matching skill before running commands. `grep "^- \*\*Owner\*\*:" .claude/skills/*/SKILL.md` to find the maintainer of any platform skill.
@@ -148,10 +148,10 @@ node dist/cli.js tours find-cross-platform-match "https://www.klook.com/en-US/ac
 
 ### Routine workflow (what a scheduled Claude Code run should do)
 
-See the **`opencli-tours-routine`** skill (`.claude/skills/opencli-tours-routine/SKILL.md`)
-for the full step-by-step playbook: pre-flight checks, feedback lookup, ingest,
-export/report, completeness review, anomaly flagging, and run summary. The
-skill is the source of truth — do not duplicate its steps here.
+See the **`opencli-routine`** skill (`.claude/skills/opencli-routine/SKILL.md`)
+for the orchestration logic: it decides per (POI, platform) target whether to
+run `opencli-scan`, `opencli-pricing`, or both — and delegates to those skills.
+The routine does not implement scan or pricing inline.
 
 ### Feedback loop
 

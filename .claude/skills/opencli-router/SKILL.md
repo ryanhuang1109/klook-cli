@@ -28,7 +28,7 @@ If the user names more than one platform (e.g. "compare Klook vs Trip"), invoke 
 
 | User intent | Invoke skill |
 |---|---|
-| Run the daily/scheduled tours update, `tours ingest` / `export` / `report` | `opencli-tours-routine` |
+| Run the daily/scheduled tours update, `tours ingest` / `export` / `report` | `opencli-routine` |
 | Compare a POI across platforms, `poi add` / `compare` / `compare-history` | `opencli-compare-poi` |
 | Single-platform pricing snapshot | The matching platform skill above |
 
@@ -46,4 +46,4 @@ If the dispatched platform skill is missing, empty (only TODO markers), or contr
 ## What this skill is NOT
 
 - It does not contain platform-specific ID formats, selectors, or quirks — those live in each platform skill.
-- It does not drive the tours pipeline end-to-end — `opencli-tours-routine` does.
+- It does not drive the tours pipeline end-to-end — `opencli-routine` does.

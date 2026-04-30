@@ -1,34 +1,51 @@
 ---
-description: Run an opencli trip task — scoped to Trip.com only (for skill owners testing their platform)
-argument-hint: [activity-id | "keyword" | --poi <name>] [--csv | --ingest]
+description: Run an opencli trip scan/pricing/all task on a POI
+argument-hint: <poi> <scan|pricing|all>   (alias: detail = scan)
 ---
 
-Invoke the `opencli-trip` skill and operate **only on Trip.com** for this turn. Do not cross into other platforms.
+Invoke the `opencli-trip` skill scoped to trip.
 
-Pre-flight: `opencli doctor` — Trip requires Browser Bridge. If it fails, stop and surface to user.
+**Input contract:** `<poi> <mode>` where mode is one of `scan | pricing | all`.
+The token `detail` is accepted as an alias for `scan`.
 
-**Argument interpretation** (parse `$ARGUMENTS` in this order):
+**Step 1 — Parse args:**
+```bash
+node dist/cli.js tours parse-slash-args $ARGUMENTS
+```
 
-1. **`--poi <name>`** → POI mode:
-   - `node dist/cli.js list-pois` — check if the POI is configured
-   - If configured, use its `keywords` to search; if missing, offer to `add-poi` first
-   - Confirm before running multi-step ingestion
+Branch on the JSON result:
 
-2. **Numeric ID** (e.g. `92795279`) → single-activity mode:
-   - Ask which sub-command: `get-activity` (full) / `get-packages` (lighter) / `get-pricing-matrix` (7-day matrix)
-   - Default to `get-activity` if user doesn't specify
+- `kind: "ok"` → continue with the `poi` and `mode` returned.
+- `kind: "ask"` → present `question` + numbered `choices` to the user and STOP. Do **not** pick a default.
+- `kind: "error"` → print `message` and STOP.
 
-3. **Quoted keyword phrase** (e.g. `"Mt Fuji day tour"`) → search mode:
-   - `opencli trip search-activities "<phrase>" --limit 5 -f json`
-   - Strip `Update available` banner lines before JSON.parse
+**Step 2 — Pre-flight:** `opencli doctor`.
+Confirm the Browser Bridge cookie locale is `en-US` (per memory `feedback_browser_bridge_en_us`). Adapters are written against en-US DOM and zh-TW silently breaks them.
 
-4. **Empty** → print command cheat-sheet from the skill body, wait for instruction
+**Step 3 — Dispatch:**
 
-**Output-format flags** (apply on top of any mode above):
-- `--csv` → append `-f csv` to the final opencli call (warning: nested payloads may flatten awkwardly)
-- `--ingest` → after scraping, pipe through `tours ingest-pricing trip <id>` to persist + then run `tours export-csv` to emit a clean planning-sheet CSV
-- **Default** → pretty-printed JSON
+| mode    | command                                                              |
+|---------|----------------------------------------------------------------------|
+| scan    | `node dist/cli.js tours scan --platform trip --poi "<poi>"`          |
+| pricing | `node dist/cli.js tours pricing --platform trip --poi "<poi>"`       |
+| all     | `tours scan ...` then `tours pin --top 5` then `tours pricing ...`   |
 
-Note: Trip has no `trending` command. After executing, cross-check output against `docs/io-schemas.md` — Trip-specific: `--compare-dates` emits extra 7-day inline prices; SKU tabs vs date cells share `.m_ceil` class.
+**Step 4 — Handle pricing's "no_pinned" branch:**
+
+If `tours pricing` returns `"no_pinned": true` (exit code 2), **do not
+auto-fallback**. Surface the choice to the user verbatim:
+
+```
+No pinned activities for trip × <poi>. Pick:
+  1) /opencli-trip <poi> all
+  2) /opencli-trip <poi> scan         (then pin later)
+  3) tours pin --platform trip --poi <poi> --top 5
+  4) cancel
+```
+
+**trip-specific quirks** (see `opencli-trip` skill for full troubleshooting):
+- No `trending` command. After executing, cross-check output against `docs/io-schemas.md` — `--compare-dates` emits extra 7-day inline prices; SKU tabs vs date cells share `.m_ceil` class.
+- Strip `Update available` banner lines before JSON.parse.
+- `--csv`: nested payloads may flatten awkwardly.
 
 $ARGUMENTS

@@ -14,6 +14,17 @@ import type { ToursDB } from './db.js';
 import type { Platform, PricingRunRaw, PricingRowRaw } from './types.js';
 import { normalizePricingRun } from './normalize.js';
 import { urlForLanguage, applyDefaultLanguage } from './url-locale.js';
+// Self-import so that vi.spyOn(ingest, 'runPricingRaw') / vi.spyOn(ingest, 'ingestFromDetail')
+// can intercept intra-module calls in vitest's ESM environment.
+import * as ingestSelf from './ingest.js';
+
+/**
+ * Pragmatic ceiling for `runSearch` over-fetch. Covers ~99% of POIs
+ * without blowing memory on browser-bridge platforms (each result
+ * carries DOM-extracted fields). Used by both `runScan` (catalog) and
+ * legacy `ingestBySearch` (coupled flow).
+ */
+export const SEARCH_COUNT_CAP = 200;
 
 function stripOpencliNoise(output: string): string {
   return output
@@ -49,7 +60,7 @@ export function runSearch(
  * Extract a numeric review count from the various string shapes search APIs
  * return — "29.2K", "1,234 reviews", "(539)", "" → number or 0 when unparseable.
  */
-function parseReviewCount(raw: string | undefined): number {
+export function parseReviewCount(raw: string | undefined): number {
   if (!raw) return 0;
   const m = raw.replace(/,/g, '').match(/([\d.]+)\s*([kKmM])?/);
   if (!m) return 0;
@@ -83,10 +94,7 @@ export async function ingestBySearch(
   // Probe the search with a HIGH cap so `total_found` reflects the real
   // population the platform returns for this keyword — not the ingest limit.
   // The same fetched list feeds the re-rank + slice, so this is one call.
-  // 200 is a pragmatic ceiling that covers 99% of POIs without blowing out
-  // memory on the browser-bridge platforms.
-  const COUNT_CAP = 200;
-  const rawHits = runSearch(opts.platform, opts.keyword, COUNT_CAP);
+  const rawHits = runSearch(opts.platform, opts.keyword, SEARCH_COUNT_CAP);
   const totalFound = rawHits.length;
 
   let ranked: SearchHit[];
@@ -303,10 +311,10 @@ function mergeRawExtras(
   normalized.activity.raw_extras_json = JSON.stringify({ ...oldX, ...newX });
 }
 
-export async function ingestPricing(
+export async function ingestPricingOnly(
   db: ToursDB,
-  opts: IngestOptions,
-): Promise<IngestResult> {
+  opts: Omit<IngestOptions, 'detailFallback'>,
+): Promise<IngestResult & { captured_days: number }> {
   const snapshotDir =
     opts.snapshotDir ?? path.join(process.cwd(), 'data', 'snapshots');
   fs.mkdirSync(snapshotDir, { recursive: true });
@@ -326,54 +334,9 @@ export async function ingestPricing(
     opencliArg = opts.activityId;
   }
 
-  const fallbackEnabled = opts.detailFallback !== false;
-  let raw: PricingRunRaw;
-  let pricingThrew: Error | null = null;
-  try {
-    raw = runPricingRaw(opts.platform, opencliArg, opts.days ?? 7);
-  } catch (err) {
-    if (!fallbackEnabled) throw err;
-    pricingThrew = err as Error;
-    // Stub so the auto-fallback below replaces it.
-    raw = {
-      activity_id: opts.activityId,
-      ota: opts.platform,
-      url: opts.canonicalUrl ?? '',
-      title: '',
-      days_requested: opts.days ?? 7,
-      days_captured: 0,
-      rows: [],
-      errors: [{ reason: `pricing-threw: ${(err as Error).message.slice(0, 200)}` }],
-    };
-  }
-
-  // Fallback when pricing produced nothing usable. Trip can return
-  // days_captured > 0 yet rows: [] (per-row price-parse failures), so we
-  // also look at the row count.
-  const noUsableRows = !Array.isArray(raw.rows) || raw.rows.length === 0;
-  if (fallbackEnabled && (raw.days_captured === 0 || noUsableRows)) {
-    // Pricing scraper produced no usable data — defer to ingestFromDetail.
-    // Detail fallback writes its own snapshot (`-detail.json`) so we don't
-    // duplicate the broken pricing snapshot if it exists.
-    const detailResult = await ingestFromDetail(db, {
-      platform: opts.platform,
-      activityId: opts.activityId,
-      poi: opts.poi ?? null,
-      canonicalUrl: opts.canonicalUrl,
-    });
-    const reason = pricingThrew
-      ? `pricing-threw: ${pricingThrew.message.slice(0, 160)}`
-      : raw.days_captured === 0
-        ? `pricing-empty (days_captured=0)`
-        : `pricing-no-rows (days_captured=${raw.days_captured}, rows=0)`;
-    return {
-      ...detailResult,
-      warnings: [
-        ...detailResult.warnings,
-        `auto-fallback to ingestFromDetail; ${reason}`,
-      ],
-    };
-  }
+  // No try/catch — let exceptions bubble up to the caller.
+  // Call through ingestSelf so vi.spyOn(ingest, 'runPricingRaw') can intercept in tests.
+  const raw = ingestSelf.runPricingRaw(opts.platform, opencliArg, opts.days ?? 7);
 
   const snapPath = snapshotPath(snapshotDir, opts.platform, opts.activityId);
   fs.writeFileSync(snapPath, JSON.stringify(raw, null, 2));
@@ -433,7 +396,73 @@ export async function ingestPricing(
     activity_written: activityWritten,
     warnings,
     snapshot_path: snapPath,
+    captured_days: raw.days_captured,
   };
+}
+
+export async function ingestPricing(
+  db: ToursDB,
+  opts: IngestOptions,
+): Promise<IngestResult & { captured_days: number }> {
+  const fallbackEnabled = opts.detailFallback !== false;
+  let result: IngestResult & { captured_days: number };
+  let pricingThrew: Error | null = null;
+
+  try {
+    // Call through ingestSelf so vi.spyOn can intercept in tests.
+    result = await ingestSelf.ingestPricingOnly(db, opts);
+  } catch (err) {
+    if (!fallbackEnabled) throw err;
+    pricingThrew = err as Error;
+    // Fake-result so we trigger the empty-fallback branch below.
+    result = {
+      activityId: opts.activityId,
+      platform: opts.platform,
+      skus_written: 0,
+      packages_written: 0,
+      observations_appended: 0,
+      activity_written: false,
+      warnings: [],
+      snapshot_path: '',
+      captured_days: 0,
+    };
+  }
+
+  // No usable data and fallback enabled → defer to ingestFromDetail.
+  // Detail fallback writes its own snapshot (`-detail.json`) so we don't
+  // duplicate the broken pricing snapshot if it exists.
+  // Post-normalize check: trigger fallback when 0 SKUs landed in the DB
+  // even though pricing was reachable. This is broader than the original
+  // raw-row check (which only saw `raw.rows.length === 0`) — it also
+  // catches the normalize-filtered-everything case (e.g. zh-TW DOM that
+  // runPricingRaw captured but the price-parse regex couldn't normalize).
+  // The trade-off: we recover with detail data instead of returning empty,
+  // at the cost of masking normalizer bugs. The silent-write warning in
+  // ingestPricingOnly still fires for skus_written===0, so the smell is
+  // not lost — it's only that the activity row gets populated by detail
+  // rather than left empty.
+  const noUsableRows = result.skus_written === 0;
+  if (fallbackEnabled && (result.captured_days === 0 || noUsableRows)) {
+    // Call through ingestSelf so vi.spyOn(ingest, 'ingestFromDetail') can intercept in tests.
+    const detailResult = await ingestSelf.ingestFromDetail(db, {
+      platform: opts.platform,
+      activityId: opts.activityId,
+      poi: opts.poi ?? null,
+      canonicalUrl: opts.canonicalUrl,
+    });
+    const reason = pricingThrew
+      ? `pricing-threw: ${pricingThrew.message.slice(0, 160)}`
+      : result.captured_days === 0
+        ? `pricing-empty (days_captured=0)`
+        : `pricing-no-skus (captured_days=${result.captured_days}, skus_written=0)`;
+    return {
+      ...detailResult,
+      captured_days: 0,
+      warnings: [...detailResult.warnings, `auto-fallback to ingestFromDetail; ${reason}`],
+    };
+  }
+
+  return result;
 }
 
 /**

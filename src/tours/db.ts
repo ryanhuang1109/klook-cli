@@ -44,6 +44,16 @@ export interface ToursDB {
   reviewActivity(id: string, status: ReviewStatus, note: string | null): void;
   reviewSKU(id: string, status: ReviewStatus, note: string | null): void;
 
+  /** Returns activities with is_pinned=1, optionally filtered by POI/platform.
+   *  Order: review_count DESC NULLS LAST. */
+  listPinnedActivities(filters?: { poi?: string; platform?: string }): Activity[];
+
+  /** Set the pin state of one activity. Persists immediately. */
+  setPinned(id: string, pinned: boolean): void;
+
+  /** Returns column names for the given table (uses PRAGMA table_info). */
+  rawColumns(table: string): string[];
+
   listActivitySummaries(): ActivitySummaryRow[];
 
   logSearchRun(run: SearchRunLog): void;
@@ -232,7 +242,8 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
       first_scraped_at TEXT NOT NULL,
       last_scraped_at TEXT NOT NULL,
       review_status TEXT NOT NULL DEFAULT 'unverified',
-      review_note TEXT
+      review_note TEXT,
+      is_pinned INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_act_platform_pid ON activities(platform, platform_product_id);
     CREATE INDEX IF NOT EXISTS idx_act_poi ON activities(poi);
@@ -347,6 +358,9 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
   if (!existingCols.has('cancellation_policy')) {
     db.run(`ALTER TABLE activities ADD COLUMN cancellation_policy TEXT`);
   }
+  if (!existingCols.has('is_pinned')) {
+    db.run(`ALTER TABLE activities ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`);
+  }
 
   function persist(): void {
     const data = db.export();
@@ -370,11 +384,22 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
     return out;
   }
 
+  // Single source of truth for activity column order (SELECT and INSERT stay in sync).
+  const ACTIVITY_COLS = [
+    'id', 'platform', 'platform_product_id', 'canonical_url', 'title',
+    'supplier', 'poi', 'duration_minutes', 'departure_city',
+    'rating', 'review_count', 'order_count', 'description',
+    'cancellation_policy', 'raw_extras_json',
+    'first_scraped_at', 'last_scraped_at',
+    'review_status', 'review_note',
+    'is_pinned',
+  ] as const;
+
   return {
     upsertActivity(a) {
       db.run(
-        `INSERT INTO activities (id, platform, platform_product_id, canonical_url, title, supplier, poi, duration_minutes, departure_city, rating, review_count, order_count, description, cancellation_policy, raw_extras_json, first_scraped_at, last_scraped_at, review_status, review_note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO activities (${ACTIVITY_COLS.join(', ')})
+         VALUES (${ACTIVITY_COLS.map(() => '?').join(', ')})
          ON CONFLICT(id) DO UPDATE SET
            title = excluded.title,
            supplier = COALESCE(excluded.supplier, activities.supplier),
@@ -387,7 +412,8 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
            description = COALESCE(excluded.description, activities.description),
            cancellation_policy = COALESCE(excluded.cancellation_policy, activities.cancellation_policy),
            raw_extras_json = excluded.raw_extras_json,
-           last_scraped_at = excluded.last_scraped_at`,
+           last_scraped_at = excluded.last_scraped_at,
+           is_pinned = activities.is_pinned`,
         [
           a.id, a.platform, a.platform_product_id, a.canonical_url, a.title,
           a.supplier, a.poi, a.duration_minutes, a.departure_city,
@@ -395,6 +421,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
           a.cancellation_policy,
           a.raw_extras_json,
           a.first_scraped_at, a.last_scraped_at, a.review_status, a.review_note,
+          a.is_pinned ?? 0,
         ],
       );
       const changed = db.getRowsModified() > 0;
@@ -464,11 +491,11 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
     },
 
     getActivity(id) {
-      return one<Activity>(`SELECT * FROM activities WHERE id = ?`, [id]);
+      return one<Activity>(`SELECT ${ACTIVITY_COLS.join(', ')} FROM activities WHERE id = ?`, [id]);
     },
 
     getActivityByUrl(url) {
-      return one<Activity>(`SELECT * FROM activities WHERE canonical_url = ?`, [url]);
+      return one<Activity>(`SELECT ${ACTIVITY_COLS.join(', ')} FROM activities WHERE canonical_url = ?`, [url]);
     },
 
     listActivities(filters = {}) {
@@ -482,8 +509,31 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
         where.push('poi = ?');
         params.push(filters.poi);
       }
-      const sql = `SELECT * FROM activities ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_scraped_at DESC`;
+      const sql = `SELECT ${ACTIVITY_COLS.join(', ')} FROM activities ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_scraped_at DESC`;
       return all<Activity>(sql, params);
+    },
+
+    listPinnedActivities(filters: { poi?: string; platform?: string } = {}) {
+      const wh: string[] = [`is_pinned = 1`];
+      const args: unknown[] = [];
+      if (filters.poi) {
+        wh.push(`LOWER(poi) = LOWER(?)`);
+        args.push(filters.poi);
+      }
+      if (filters.platform) {
+        wh.push(`platform = ?`);
+        args.push(filters.platform);
+      }
+      return all<Activity>(
+        `SELECT ${ACTIVITY_COLS.join(', ')} FROM activities WHERE ${wh.join(' AND ')} ` +
+        `ORDER BY review_count IS NULL, review_count DESC`,
+        args,
+      );
+    },
+
+    setPinned(id: string, pinned: boolean) {
+      db.run(`UPDATE activities SET is_pinned = ? WHERE id = ?`, [pinned ? 1 : 0, id]);
+      persist();
     },
 
     listPackagesForActivity(activityId) {
@@ -677,7 +727,7 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
 
     dumpForSync(opts = {}) {
       const since = opts.since ?? null;
-      const activities = all<any>(`SELECT * FROM activities`);
+      const activities = all<any>(`SELECT ${ACTIVITY_COLS.join(', ')} FROM activities`);
       const packages = all<any>(`SELECT * FROM packages`);
       const skus = all<any>(`SELECT * FROM skus`);
       const observations = since
@@ -714,6 +764,21 @@ export async function openDB(dbPath?: string): Promise<ToursDB> {
              FROM coverage_runs ORDER BY id`,
           );
       return { activities, packages, skus, observations, sessions, executions, searchRuns, coverageRuns };
+    },
+
+    rawColumns(table: string): string[] {
+      const ALLOWED = new Set([
+        'activities', 'packages', 'skus', 'sku_observations',
+        'run_sessions', 'execution_logs', 'search_runs', 'coverage_runs',
+      ]);
+      if (!ALLOWED.has(table)) {
+        throw new Error(`rawColumns: unknown table "${table}"`);
+      }
+      const stmt = db.prepare(`PRAGMA table_info(${table})`);
+      const out: string[] = [];
+      while (stmt.step()) out.push((stmt.getAsObject() as any).name);
+      stmt.free();
+      return out;
     },
 
     close() {

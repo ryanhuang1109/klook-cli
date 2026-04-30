@@ -295,6 +295,6 @@ Platform skills (`opencli-klook`, `opencli-trip`, `opencli-getyourguide`, `openc
 2. Shows the platform-specific nuances in output (e.g. GYG language axis, KKday booking counter, Trip `--compare-dates` field).
 3. References this document for the canonical shape.
 
-Cross-platform skills (`opencli-tours-routine`, `opencli-compare-poi`) should reference the DB tables they read/write from, **not** re-document the CLI output shape.
+Cross-platform skills (`opencli-routine`, `opencli-compare-poi`) should reference the DB tables they read/write from, **not** re-document the CLI output shape.
 
 The router skill (`opencli-router`) doesn't need a schema section — it dispatches, doesn't consume.
