@@ -18,12 +18,14 @@ export default async function PackagesPage({
   searchParams: Promise<{ platform?: Platform; poi?: string; activity?: string }>;
 }) {
   const sp = await searchParams;
+  const poiFilter = parseCsv(sp.poi);
+  const activityFilter = parseCsv(sp.activity);
   const all = await listPackagesWithStats();
   const rows = all
     .filter((r) => {
       if (sp.platform && r.platform !== sp.platform) return false;
-      if (sp.poi && r.poi !== sp.poi) return false;
-      if (sp.activity && activityKey(r) !== sp.activity) return false;
+      if (poiFilter.length > 0 && (!r.poi || !poiFilter.includes(r.poi))) return false;
+      if (activityFilter.length > 0 && !activityFilter.includes(activityKey(r))) return false;
       return true;
     })
     .sort((a, b) => {
@@ -70,8 +72,8 @@ export default async function PackagesPage({
         pois={allPois}
         activities={activityOptions}
         defaultPlatform={sp.platform}
-        defaultPoi={sp.poi}
-        defaultActivity={sp.activity}
+        defaultPois={poiFilter}
+        defaultActivities={activityFilter}
       />
 
       <PackagesTable
@@ -87,6 +89,11 @@ export default async function PackagesPage({
 
 function uniq(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function parseCsv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 function activityKey(r: PackageWithStats): string {

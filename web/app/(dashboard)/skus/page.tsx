@@ -18,9 +18,11 @@ export default async function SkusPage({
 }) {
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+  const poiFilter = parseCsv(sp.poi);
+  const activityFilter = parseCsv(sp.activity);
 
   const all = readPlanningRows();
-  const filtered = sortByActivity(filter(all, sp.platform, sp.poi, sp.activity));
+  const filtered = sortByActivity(filter(all, sp.platform, poiFilter, activityFilter));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * PAGE_SIZE;
@@ -63,8 +65,8 @@ export default async function SkusPage({
         pois={allPois}
         activities={activityOptions}
         defaultPlatform={sp.platform}
-        defaultPoi={sp.poi}
-        defaultActivity={sp.activity}
+        defaultPois={poiFilter}
+        defaultActivities={activityFilter}
       />
 
       <SkusTable
@@ -83,19 +85,24 @@ export default async function SkusPage({
 
 function filter(
   rows: PlanningRow[],
-  platform?: Platform,
-  poi?: string,
-  activity?: string,
+  platform: Platform | undefined,
+  pois: string[],
+  activities: string[],
 ): PlanningRow[] {
   return rows.filter((r) => {
     if (platform) {
       const p = otaToPlatform(r.ota);
       if (p !== platform) return false;
     }
-    if (poi && r.main_poi !== poi) return false;
-    if (activity && r.product_id !== activity) return false;
+    if (pois.length > 0 && (!r.main_poi || !pois.includes(r.main_poi))) return false;
+    if (activities.length > 0 && (!r.product_id || !activities.includes(r.product_id))) return false;
     return true;
   });
+}
+
+function parseCsv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 function sortByActivity(rows: PlanningRow[]): PlanningRow[] {

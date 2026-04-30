@@ -2,13 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiCombobox } from '@/components/dashboard/multi-combobox';
 import { PlatformLogo } from '@/components/dashboard/platform-logo';
 import type { Platform } from '@/lib/data';
 import type { SkuActivityOption } from './page';
@@ -37,25 +31,26 @@ export function SkusFilters({
   pois,
   activities,
   defaultPlatform,
-  defaultPoi,
-  defaultActivity,
+  defaultPois,
+  defaultActivities,
 }: {
   platforms: Platform[];
   pois: string[];
   activities: SkuActivityOption[];
   defaultPlatform?: Platform;
-  defaultPoi?: string;
-  defaultActivity?: string;
+  defaultPois: string[];
+  defaultActivities: string[];
 }) {
   const router = useRouter();
   const sp = useSearchParams();
   const [, startTransition] = useTransition();
   const selected = defaultPlatform ?? 'all';
 
-  function update(patch: Record<string, string | null | undefined>) {
+  function update(patch: Record<string, string | string[] | null | undefined>) {
     const next = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(patch)) {
-      if (v && v !== 'all') next.set(k, v);
+      const flat = Array.isArray(v) ? v.join(',') : v;
+      if (flat && flat !== 'all') next.set(k, flat);
       else next.delete(k);
     }
     // Changing a filter resets pagination — otherwise users land on a page
@@ -84,34 +79,20 @@ export function SkusFilters({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          value={defaultPoi ?? 'all'}
-          onValueChange={(v) => update({ poi: v })}
-        >
-          <SelectTrigger className="w-[220px] h-9">
-            <SelectValue placeholder="All POIs" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectItem value="all">All POIs</SelectItem>
-            {pois.map((p) => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={defaultActivity ?? 'all'}
-          onValueChange={(v) => update({ activity: v })}
-        >
-          <SelectTrigger className="w-[340px] h-9">
-            <SelectValue placeholder="Group by activity" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectItem value="all">All activities</SelectItem>
-            {activities.map((a) => (
-              <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiCombobox
+          options={pois.map((p) => ({ value: p, label: p }))}
+          value={defaultPois}
+          onChange={(v) => update({ poi: v })}
+          placeholder="All POIs"
+          width="w-[240px]"
+        />
+        <MultiCombobox
+          options={activities.map((a) => ({ value: a.id, label: a.label }))}
+          value={defaultActivities}
+          onChange={(v) => update({ activity: v })}
+          placeholder="All activities"
+          width="w-[380px]"
+        />
       </div>
     </div>
   );

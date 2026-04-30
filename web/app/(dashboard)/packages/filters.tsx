@@ -2,13 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiCombobox } from '@/components/dashboard/multi-combobox';
 import { PlatformLogo } from '@/components/dashboard/platform-logo';
 import type { Platform } from '@/lib/data';
 import type { ActivityOption } from './page';
@@ -37,15 +31,15 @@ export function PackagesFilters({
   pois,
   activities,
   defaultPlatform,
-  defaultPoi,
-  defaultActivity,
+  defaultPois,
+  defaultActivities,
 }: {
   platforms: Platform[];
   pois: string[];
   activities: ActivityOption[];
   defaultPlatform?: Platform;
-  defaultPoi?: string;
-  defaultActivity?: string;
+  defaultPois: string[];
+  defaultActivities: string[];
 }) {
   const filteredActivities = defaultPlatform
     ? activities.filter((a) => a.platform === defaultPlatform)
@@ -55,10 +49,11 @@ export function PackagesFilters({
   const [, startTransition] = useTransition();
   const selected = defaultPlatform ?? 'all';
 
-  function update(patch: Record<string, string | null | undefined>) {
+  function update(patch: Record<string, string | string[] | null | undefined>) {
     const next = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(patch)) {
-      if (v && v !== 'all') next.set(k, v);
+      const flat = Array.isArray(v) ? v.join(',') : v;
+      if (flat && flat !== 'all') next.set(k, flat);
       else next.delete(k);
     }
     const qs = next.toString();
@@ -84,34 +79,20 @@ export function PackagesFilters({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          value={defaultPoi ?? 'all'}
-          onValueChange={(v) => update({ poi: v })}
-        >
-          <SelectTrigger className="w-[200px] h-9">
-            <SelectValue placeholder="All POIs" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectItem value="all">All POIs</SelectItem>
-            {pois.map((p) => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={defaultActivity ?? 'all'}
-          onValueChange={(v) => update({ activity: v })}
-        >
-          <SelectTrigger className="w-[320px] h-9">
-            <SelectValue placeholder="Group by activity" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectItem value="all">All activities</SelectItem>
-            {filteredActivities.map((a) => (
-              <SelectItem key={a.key} value={a.key}>{a.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiCombobox
+          options={pois.map((p) => ({ value: p, label: p }))}
+          value={defaultPois}
+          onChange={(v) => update({ poi: v })}
+          placeholder="All POIs"
+          width="w-[220px]"
+        />
+        <MultiCombobox
+          options={filteredActivities.map((a) => ({ value: a.key, label: a.label }))}
+          value={defaultActivities}
+          onChange={(v) => update({ activity: v })}
+          placeholder="All activities"
+          width="w-[360px]"
+        />
       </div>
     </div>
   );
