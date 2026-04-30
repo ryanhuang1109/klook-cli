@@ -99,6 +99,31 @@ describe('runScan', () => {
     vi.useRealTimers();
   });
 
+  it('retries on spawnSync ETIMEDOUT (slow detail page)', async () => {
+    vi.spyOn(ingest, 'runSearch').mockReturnValue([
+      { title: 'A', url: 'https://www.getyourguide.com/x-l1/y-t1/', review_count: '10' },
+    ] as any);
+    let attempts = 0;
+    vi.spyOn(ingest, 'ingestFromDetail').mockImplementation(async () => {
+      attempts++;
+      if (attempts === 1) throw new Error('spawnSync opencli ETIMEDOUT');
+      return {} as any;
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const fakeDb: any = { logSearchRun: vi.fn(), logExecution: vi.fn() };
+    const promise = runScan(fakeDb, {
+      platform: 'getyourguide', poi: 'mt fuji', keyword: 'mt fuji', limit: 1,
+    });
+    await vi.runAllTimersAsync();
+    const r = await promise;
+
+    expect(attempts).toBe(2);
+    expect(r.succeeded).toBe(1);
+    expect(r.failed).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
   it('does NOT retry on non-transient error', async () => {
     vi.spyOn(ingest, 'runSearch').mockReturnValue([
       { title: 'A', url: 'https://www.kkday.com/en/product/1', review_count: '10' },
