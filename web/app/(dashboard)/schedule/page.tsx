@@ -11,21 +11,55 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { fmtDateTime, durationBetween } from '@/lib/format';
+import { getRoutineConfig, type RoutineConfig } from './actions';
+import ConfigForm from './config-form';
 
 export const metadata = { title: 'Schedule — CSI' };
 export const dynamic = 'force-dynamic';
 
+const DEFAULT_CONFIG: RoutineConfig = {
+  pois: [],
+  competitors: ['klook', 'trip', 'getyourguide', 'kkday'],
+  limit_per_platform: 30,
+  pin_top: 5,
+  sort: 'reviews',
+  screenshot: false,
+};
+
 export default async function SchedulePage() {
-  const sessions = await listSessions(15);
+  const [sessions, configRow] = await Promise.all([
+    listSessions(15),
+    getRoutineConfig().catch((err) => {
+      // Don't crash the page if Supabase is unreachable — just render the
+      // form with defaults and surface the error inline below.
+      return { __error: (err as Error).message } as unknown as Awaited<
+        ReturnType<typeof getRoutineConfig>
+      > & { __error?: string };
+    }),
+  ]);
   const state = readRoutineState();
   const lastRun = sessions[0]?.started_at ?? null;
   const lastSucceeded = sessions.find((s) => s.status === 'succeeded' || s.status === 'finished');
   const failedRecently = sessions.slice(0, 5).filter((s) => s.status === 'failed').length;
 
+  const configErr = (configRow as unknown as { __error?: string })?.__error ?? null;
+  const config = (configRow && !configErr ? (configRow as { config: RoutineConfig }).config : null)
+    ?? DEFAULT_CONFIG;
+  const updatedAt = (configRow as unknown as { updated_at?: string })?.updated_at ?? null;
+  const updatedBy = (configRow as unknown as { updated_by?: string | null })?.updated_by ?? null;
+
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Schedule</h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          Edit the daily-routine config below — saved values land in
+          Supabase and the local cron picks them up on the next run via
+          <code className="ml-1 px-1.5 py-0.5 bg-zinc-100 rounded font-mono text-xs">
+            tours routine fetch-config
+          </code>
+          .
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -35,9 +69,9 @@ export default async function SchedulePage() {
           hint={state?.host?.last_run ? `last run ${fmtDateTime(state.host.last_run)}` : null}
         />
         <KpiCard
-          label="Routine config"
-          value={state?.config ? '✓ configured' : '— not yet'}
-          hint={state?.config?.frequency ?? null}
+          label="POIs configured"
+          value={config.pois.length}
+          hint={config.competitors.length + ' competitors'}
         />
         <KpiCard
           label="Recent failures"
@@ -47,16 +81,38 @@ export default async function SchedulePage() {
         />
       </div>
 
-      {state?.config ? (
-        <section>
-          <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-2">
-            Routine config
-          </h2>
-          <pre className="rounded-xl border border-zinc-200/80 bg-white p-4 text-xs font-mono text-zinc-700 overflow-x-auto">
-            {JSON.stringify(state.config, null, 2)}
-          </pre>
-        </section>
-      ) : null}
+      <section>
+        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-3">
+          Routine config
+          {configErr ? (
+            <span className="ml-2 text-rose-600 normal-case font-normal">
+              · {configErr} (showing defaults)
+            </span>
+          ) : null}
+        </h2>
+        <ConfigForm
+          initial={config}
+          updatedAt={updatedAt}
+          updatedBy={updatedBy}
+        />
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+          Cron suggestions
+        </h2>
+        <div className="rounded-xl border border-zinc-200/80 bg-white p-5 text-xs font-mono space-y-1 text-zinc-700">
+          <div># daily price refresh of pinned activities (cheap)</div>
+          <div>0 9 * * *  /path/to/klook-cli/scripts/daily-routine.sh pricing</div>
+          <div className="pt-2"># weekly broad-coverage scan + re-pin (heavier)</div>
+          <div>0 10 * * 0  /path/to/klook-cli/scripts/daily-routine.sh scan</div>
+        </div>
+        <p className="text-xs text-zinc-500 mt-2">
+          Add to your crontab via{' '}
+          <code className="px-1 bg-zinc-100 rounded">crontab -e</code>. The
+          script reads the config saved above on every run.
+        </p>
+      </section>
 
       {state?.host ? (
         <section>

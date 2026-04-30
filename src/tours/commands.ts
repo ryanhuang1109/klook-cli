@@ -675,3 +675,35 @@ export async function cmdPin(opts: {
   db.close();
   console.log(JSON.stringify(result, null, 2));
 }
+
+export async function cmdRoutineFetchConfig(opts: { out?: string; allowFallback?: boolean }): Promise<void> {
+  loadEnv();
+  const out = opts.out ?? path.join(process.cwd(), 'data', 'routine-config.json');
+  const { fetchRoutineConfigFromSupabase, fetchOrFallback, writeLocalConfig } = await import('./routine-config.js');
+  const result = opts.allowFallback === false
+    ? await fetchRoutineConfigFromSupabase()
+    : await fetchOrFallback(out);
+  writeLocalConfig(result.config, out);
+  console.log(JSON.stringify({
+    out,
+    source: result.source,
+    updated_at: result.updated_at,
+    updated_by: result.updated_by,
+    poi_count: result.config.pois?.length ?? 0,
+    competitors: result.config.competitors,
+  }, null, 2));
+}
+
+export async function cmdRoutinePushConfig(opts: { in?: string; updatedBy?: string }): Promise<void> {
+  loadEnv();
+  const inPath = opts.in ?? path.join(process.cwd(), 'data', 'routine-config.json');
+  const { readLocalConfig, pushRoutineConfigToSupabase } = await import('./routine-config.js');
+  const config = readLocalConfig(inPath);
+  const result = await pushRoutineConfigToSupabase(config, opts.updatedBy ?? 'cli:push');
+  console.log(JSON.stringify({
+    in: inPath,
+    pushed_at: result.updated_at,
+    poi_count: config.pois?.length ?? 0,
+    competitors: config.competitors,
+  }, null, 2));
+}
